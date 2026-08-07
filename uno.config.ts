@@ -12,9 +12,16 @@ import {
 } from 'unocss'
 
 export default defineConfig({
+  // Palette names passed to DisplayBadge/DisplayLabel as dynamic props are not
+  // statically extractable, so the badge-color-* classes need a safelist.
+  safelist: [
+    'badge-color-primary',
+    'badge-color-success',
+    'badge-color-warning',
+    'badge-color-red',
+    'badge-color-blue',
+  ],
   shortcuts: [
-    ['btn', 'px-4 py-1 rounded inline-block bg-teal-600 text-white cursor-pointer hover:bg-teal-700 disabled:cursor-default disabled:bg-gray-600 disabled:opacity-50'],
-    ['icon-btn', 'inline-block cursor-pointer select-none opacity-75 transition duration-200 ease-in-out hover:opacity-100 hover:text-teal-600'],
     ['z-nav', 'z-[30]'],
     ['z-dropdown', 'z-[40]'],
     ['z-tooltip', 'z-[45]'],

@@ -1,17 +1,25 @@
 <script setup lang="ts">
-const router = useRouter()
+import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
+import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
+import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
 </script>
 
 <template>
-  <main p="x4 y10" text="center teal-700 dark:gray-200">
-    <div text-4xl>
-      <div i-carbon-warning inline-block />
-    </div>
-    <div>Not found</div>
-    <div>
-      <button text-sm btn m="3 t8" @click="router.back()">
-        Back
-      </button>
-    </div>
-  </main>
+  <LayoutPanelGrids variant="grid" :size="24" class="border border-base rounded-2xl bg-base">
+    <FeedbackEmptyState icon="i-carbon-warning" title="Not found">
+      <template #hint>
+        The page you are looking for does not exist or has moved.
+      </template>
+      <template #actions>
+        <ActionButton
+          as="NuxtLink"
+          to="/"
+          icon="i-carbon-arrow-left"
+          variant="primary"
+        >
+          Back to lobby
+        </ActionButton>
+      </template>
+    </FeedbackEmptyState>
+  </LayoutPanelGrids>
 </template>

@@ -9,6 +9,7 @@
     "generate": "nuxt generate",
     "prepare": "nuxt prepare && skills-npm",
     "preview": "nuxt preview",
+    "rooms:create": "node scripts/create-rooms.mjs",
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
@@ -16,12 +17,15 @@
   },
   "dependencies": {
     "@antfu/design": "catalog:design",
+    "@speed-highlight/core": "catalog:frontend",
     "colorjs.io": "catalog:design",
-    "floating-vue": "catalog:design"
+    "floating-vue": "catalog:design",
+    "reka-ui": "catalog:design"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev",
     "@iconify-json/carbon": "catalog:icons",
+    "@iconify-json/ph": "catalog:icons",
     "@iconify-json/twemoji": "catalog:icons",
     "@nuxt/devtools": "catalog:build",
     "@nuxt/eslint": "catalog:build",
