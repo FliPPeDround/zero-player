@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "skills": {
+    "antfu-design": {
+      "source": "antfu/design",
+      "sourceType": "github",
+      "skillPath": "skills/antfu-design/SKILL.md",
+      "computedHash": "aab95a8f73c3057201a72f6e3694c861b7f4df60a6f88cf9411e4ad223355c4a"
+    },
+    "leafer-ai": {
+      "source": "leaferjs/ai-docs",
+      "sourceType": "github",
+      "skillPath": "skills/leafer-ai/SKILL.md",
+      "computedHash": "ec6255aebbcf0d644c22dcc7a3f02375a1201dfaf8a6d26621dd2817e4773c41"
+    },
+    "manage-mcp": {
+      "source": "mcp-toolkit.nuxt.dev",
+      "sourceUrl": "https://mcp-toolkit.nuxt.dev",
+      "sourceType": "well-known",
+      "computedHash": "827ea7d7e144b091850231e2c866b110c46f2b654c5c030a35ca4d3e4be98202",
+      "wellKnownDigest": "sha256:5620bf46f287c330d7d674558988940486c825881319f9d3be3845cb088dc1f1"
+    },
+    "nitro": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/nitro/SKILL.md",
+      "computedHash": "f8341eaf6fbdc604c2c8123a275407acea5a74ad3b0870cdd0ed2a3007e36c12"
+    },
+    "nuxt": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/nuxt/SKILL.md",
+      "computedHash": "96dbdbfc06bf7045aeb9a463b972d5c0b5679d6dadf196d8ef6b98dc6defed2d"
+    },
+    "pinia": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pinia/SKILL.md",
+      "computedHash": "897b6b0982956f41f5cc85128ca638b625e1b3c8bc619e303cd1e7661c95b7de"
+    },
+    "pnpm": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pnpm/SKILL.md",
+      "computedHash": "2ec08c851c6f901d4ed72c21b826416ed074a487db65662b36249418afd728bf"
+    },
+    "unocss": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/unocss/SKILL.md",
+      "computedHash": "4b7a9f7b89994d5aef70b9d55cb7f65d6e80cea437d5786cd33bb5cf7231c7c4"
+    },
+    "vueuse-functions": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vueuse-functions/SKILL.md",
+      "computedHash": "5f32cd5f744671178284887c9ffc27a080e0e3316c0f7c3b22f4459c760daf49"
+    }
+  }
+}

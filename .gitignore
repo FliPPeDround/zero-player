@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+*.log
+dist
+.output
+.nuxt
+.env
+.idea/
+public/assets/fonts
+
+# Agent skills from npm packages (managed by skills-npm)
+**/skills/npm-*
+
+.data
