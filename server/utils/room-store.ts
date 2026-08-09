@@ -10,6 +10,7 @@ import type {
 } from '#shared/rooms'
 import type { AgentIdentity } from './agent'
 import { randomUUID } from 'node:crypto'
+import process from 'node:process'
 import { getGame } from '#shared/games'
 import { toRoomSummary } from '#shared/rooms'
 import { createGameInstance } from '../games/registry'
@@ -24,7 +25,20 @@ const ROOM_KEY_PREFIX = 'rooms:'
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
 
+const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
+const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
+const TERMINAL_RETENTION_MS = envMs('ROOMS_TERMINAL_RETENTION_MS', 10 * 60 * 1000)
+const KV_TTL_MAX_SECONDS = 60 * 60 * 24 * 7
+
 let eventCounter = 0
+
+function envMs(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (!raw)
+    return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
 
 function roomKey(roomId: string): string {
   return `${ROOM_KEY_PREFIX}${roomId}`
@@ -77,6 +91,38 @@ function touch(room: Room): void {
   room.updatedAt = new Date().toISOString()
 }
 
+function isTerminalStatus(status: Room['status']): boolean {
+  return status === 'finished' || status === 'aborted'
+}
+
+/**
+ * Deadline after which the room is closed. `waiting`/`playing` rooms keep
+ * extending it on activity (`updatedAt`); terminal rooms keep it fixed at
+ * finish/abort time plus the retention window so spectators can review the
+ * result before the room disappears.
+ */
+function computeClosesAt(room: Room): string | undefined {
+  const deadlineMs = (() => {
+    if (room.status === 'waiting')
+      return new Date(room.updatedAt).getTime() + WAITING_IDLE_MS
+    if (room.status === 'playing')
+      return new Date(room.updatedAt).getTime() + STALL_TIMEOUT_MS
+    if (room.status === 'finished' && room.finishedAt)
+      return new Date(room.finishedAt).getTime() + TERMINAL_RETENTION_MS
+    if (room.status === 'aborted' && room.abortedAt)
+      return new Date(room.abortedAt).getTime() + TERMINAL_RETENTION_MS
+    return undefined
+  })()
+  return deadlineMs === undefined ? undefined : new Date(deadlineMs).toISOString()
+}
+
+function ttlSecondsUntil(room: Room): number | undefined {
+  if (!room.closesAt)
+    return undefined
+  const seconds = Math.ceil((new Date(room.closesAt).getTime() - Date.now()) / 1000)
+  return Math.min(Math.max(seconds, 60), KV_TTL_MAX_SECONDS)
+}
+
 function appendEvent(
   room: Room,
   type: RoomEventType,
@@ -113,9 +159,41 @@ function addPlayer(room: Room, agent: AgentIdentity): RoomPlayer {
 }
 
 async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<void> {
-  await kv.set(roomKey(room.id), room)
+  room.closesAt = computeClosesAt(room)
+  const ttl = ttlSecondsUntil(room)
+  await kv.set(roomKey(room.id), room, ttl ? { ttl } : undefined)
   emitList(type, room)
   emitDetail(room.id, { type: 'update', room })
+}
+
+async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promise<Room | null> {
+  const room = await getRoom(roomId)
+  if (!room)
+    return null
+  appendEvent(room, 'room_closed', by, { reason })
+  await kv.del(roomKey(roomId))
+  emitList('deleted', room)
+  emitDetail(roomId, { type: 'closed', room })
+  return room
+}
+
+/**
+ * Interrupted game state: neither a win, loss nor draw — the match simply
+ * cannot continue (stall timeout, host abandoning). Terminal like `finished`,
+ * so the room follows the retention window before being deleted.
+ */
+async function abortRoom(room: Room, by?: string, reason: 'timeout' | 'abandoned' = 'timeout'): Promise<Room> {
+  room.status = 'aborted'
+  room.abortedAt = new Date().toISOString()
+  room.winner = undefined
+  if (room.game) {
+    room.game.status = 'aborted'
+    room.game.winner = undefined
+    room.game.finishReason = reason
+  }
+  appendEvent(room, 'game_aborted', by, { reason })
+  await persistRoom(room, 'updated')
+  return room
 }
 
 async function startGame(room: Room): Promise<void> {
@@ -223,7 +301,7 @@ export async function findActiveRoomForSession(sessionId: string): Promise<Room 
   const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
   return storedRooms.find((room): room is Room => (
     room !== null
-    && room.status !== 'finished'
+    && !isTerminalStatus(room.status)
     && room.players.some(player => player.sessionId === sessionId)
   )) ?? null
 }
@@ -275,10 +353,7 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
     room.hostSessionId = room.players[0].sessionId
 
   if (room.players.length === 0) {
-    await kv.del(roomKey(room.id))
-    emitList('deleted', room)
-    emitDetail(room.id, { type: 'update', room })
-    return room
+    return (await deleteRoom(room.id)) ?? room
   }
 
   await persistRoom(room, 'updated')
@@ -350,4 +425,54 @@ export async function finishGame(roomId: string, winner?: string): Promise<void>
     reason: room.game?.finishReason,
   })
   await persistRoom(room, 'updated')
+}
+
+/**
+ * Explicit host close. `waiting`/terminal rooms are deleted immediately;
+ * a running game is aborted (`abandoned`) so spectators keep a final board
+ * until the retention window elapses.
+ */
+export async function closeRoom(roomId: string, agent: AgentIdentity): Promise<Room> {
+  const room = await requireRoom(roomId)
+  if (room.hostSessionId !== agent.sessionId)
+    throw createError({ statusCode: 403, statusMessage: 'Only the host can close this room' })
+  if (room.status === 'playing')
+    return await abortRoom(room, agent.nickname, 'abandoned')
+  return (await deleteRoom(roomId, 'host-closed', agent.nickname)) ?? room
+}
+
+/**
+ * Periodic sweep called by the `rooms:cleanup` task. Rooms past their
+ * `closesAt` are closed: running games are aborted first (timeout) and enter
+ * the terminal retention window; everything else is deleted and broadcast.
+ * kv TTL is the backstop in case this task never runs (e.g. serverless).
+ */
+export async function sweepExpiredRooms(): Promise<number> {
+  const keys = await kv.keys(ROOM_KEY_PREFIX)
+  const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
+  let closed = 0
+
+  for (const room of storedRooms) {
+    if (!room)
+      continue
+    if (!room.closesAt) {
+      room.closesAt = computeClosesAt(room)
+      await persistRoom(room, 'updated')
+    }
+    if (!room.closesAt)
+      continue
+    if (new Date(room.closesAt).getTime() > Date.now())
+      continue
+
+    if (room.status === 'playing') {
+      await abortRoom(room, undefined, 'timeout')
+      closed += 1
+      continue
+    }
+
+    await deleteRoom(room.id)
+    closed += 1
+  }
+
+  return closed
 }

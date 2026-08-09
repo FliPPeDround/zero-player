@@ -25,12 +25,14 @@ const statusFilter = ref<'all' | RoomSummary['status']>('all')
 const waitingCount = computed(() => props.rooms.filter(room => room.status === 'waiting').length)
 const playingCount = computed(() => props.rooms.filter(room => room.status === 'playing').length)
 const finishedCount = computed(() => props.rooms.filter(room => room.status === 'finished').length)
+const abortedCount = computed(() => props.rooms.filter(room => room.status === 'aborted').length)
 
 const statusTabs = computed(() => [
   { value: 'all', label: 'All', count: props.rooms.length },
   { value: 'waiting', label: 'Waiting', count: waitingCount.value },
   { value: 'playing', label: 'Playing', count: playingCount.value },
   { value: 'finished', label: 'Finished', count: finishedCount.value },
+  { value: 'aborted', label: 'Aborted', count: abortedCount.value },
 ])
 
 const filteredRooms = computed(() => {

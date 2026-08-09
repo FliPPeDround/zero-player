@@ -18,6 +18,7 @@ export default defineConfig({
     'badge-color-primary',
     'badge-color-success',
     'badge-color-warning',
+    'badge-color-error',
     'badge-color-red',
     'badge-color-blue',
   ],

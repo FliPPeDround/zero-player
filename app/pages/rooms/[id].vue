@@ -16,7 +16,7 @@ import LayoutSeparator from '@antfu/design/components/Layout/LayoutSeparator.vue
 
 const route = useRoute()
 const roomId = computed(() => String(route.params.id ?? ''))
-const { room, pending, error, open, close } = await useRoomDetailFeed(roomId)
+const { room, pending, error, closed, open, close } = await useRoomDetailFeed(roomId)
 
 onMounted(open)
 onUnmounted(close)
@@ -33,9 +33,10 @@ const turnLabel = computed(() => {
   const game = room.value?.game
   if (!game)
     return 'Waiting'
-  if (game.status === 'finished') {
+  if (game.status === 'aborted')
+    return 'Aborted'
+  if (game.status === 'finished')
     return game.winner ? 'Finished' : 'Draw'
-  }
   if (!game.currentPlayerId)
     return 'Waiting'
   const index = game.players.findIndex(player => player.sessionId === game.currentPlayerId)
@@ -46,6 +47,8 @@ const turnColor = computed(() => {
   const game = room.value?.game
   if (!game)
     return false
+  if (game.status === 'aborted')
+    return 'error'
   if (game.status === 'finished')
     return game.winner ? 'success' : false
   return 'primary'
@@ -54,9 +57,19 @@ const turnColor = computed(() => {
 const turnDotClass = computed(() => {
   if (turnColor.value === 'success')
     return 'bg-success-500'
+  if (turnColor.value === 'error')
+    return 'bg-error-500'
   if (turnColor.value === 'primary')
     return 'bg-primary-500'
   return 'bg-hover'
+})
+
+const closesInLabel = computed(() => {
+  const at = room.value?.closesAt
+  if (!at)
+    return null
+  const minutes = Math.max(1, Math.ceil((new Date(at).getTime() - Date.now()) / 60_000))
+  return `In ~${minutes}m`
 })
 
 const lastMoveLabel = computed(() => {
@@ -74,6 +87,7 @@ const statusMeta = {
   waiting: { color: 'warning', label: 'Waiting' },
   playing: { color: 'success', label: 'Playing' },
   finished: { color: false, label: 'Finished' },
+  aborted: { color: 'error', label: 'Aborted' },
 } as const
 
 const eventMeta: Record<RoomEvent['type'], { color: string | false, label: string, icon: string }> = {
@@ -82,6 +96,8 @@ const eventMeta: Record<RoomEvent['type'], { color: string | false, label: strin
   game_started: { color: 'primary', label: 'Started', icon: 'i-carbon-play' },
   move: { color: 'blue', label: 'Move', icon: 'i-carbon-move' },
   game_finished: { color: false, label: 'Finished', icon: 'i-carbon-flag' },
+  game_aborted: { color: 'error', label: 'Aborted', icon: 'i-carbon-stop-outline' },
+  room_closed: { color: false, label: 'Closed', icon: 'i-carbon-close-outline' },
 }
 
 const players = computed(() => {
@@ -158,6 +174,16 @@ useHead({
     >
       <template #hint>
         {{ error }}
+      </template>
+    </FeedbackEmptyState>
+
+    <FeedbackEmptyState
+      v-else-if="closed"
+      icon="i-carbon-close-outline"
+      title="Room closed"
+    >
+      <template #hint>
+        {{ room?.name }} has been closed and removed from the lobby.
       </template>
     </FeedbackEmptyState>
 
@@ -308,6 +334,15 @@ useHead({
             </DisplayKeyValue>
             <DisplayKeyValue v-if="room.finishedAt" label="Finished">
               <DisplayDate :date="room.finishedAt" />
+            </DisplayKeyValue>
+            <DisplayKeyValue v-if="room.abortedAt" label="Aborted">
+              <DisplayDate :date="room.abortedAt" />
+            </DisplayKeyValue>
+            <DisplayKeyValue
+              v-if="closesInLabel && (room.status === 'finished' || room.status === 'aborted')"
+              label="Auto-closes"
+            >
+              <span class="text-mini color-muted">{{ closesInLabel }}</span>
             </DisplayKeyValue>
           </LayoutCard>
 

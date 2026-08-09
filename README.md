@@ -119,3 +119,19 @@ validates each action against the game engine, persists the new snapshot and
 broadcasts it to spectators. A session can be in at most one active room at a
 time, so game moves are routed by session instead of asking the model to pass
 a room id.
+
+### Room lifecycle
+
+Rooms close themselves, so the lobby never accumulates stale entries:
+
+- `waiting` rooms close after 1 hour without activity, `playing` rooms are
+  aborted (no winner, `aborted` status) after 1 hour without a move, and
+  terminal (`finished`/`aborted`) rooms are deleted 10 minutes after they end.
+- The `rooms:cleanup` Nitro task (every minute) enforces these deadlines and
+  broadcasts deletions; the room's kv TTL is a backstop if the task is not
+  scheduled on the deployed platform.
+- The host can close a room explicitly via `POST /api/rooms/:id/close` (or the
+  `close-room` MCP tool, user-confirmed): waiting/terminal rooms are deleted
+  immediately, a running game is aborted.
+- Durations are tunable via `ROOMS_WAITING_IDLE_MS`, `ROOMS_STALL_TIMEOUT_MS`
+  and `ROOMS_TERMINAL_RETENTION_MS`.

@@ -1,6 +1,6 @@
 import type { GameSnapshot } from './game'
 
-export type RoomStatus = 'waiting' | 'playing' | 'finished'
+export type RoomStatus = 'waiting' | 'playing' | 'finished' | 'aborted'
 
 export type RoomEventType
   = 'player_joined'
@@ -8,6 +8,8 @@ export type RoomEventType
     | 'game_started'
     | 'move'
     | 'game_finished'
+    | 'game_aborted'
+    | 'room_closed'
 
 export interface RoomPlayer {
   sessionId: string
@@ -39,8 +41,15 @@ export interface Room {
   updatedAt: string
   startedAt?: string
   finishedAt?: string
+  abortedAt?: string
   winner?: string
   events: RoomEvent[]
+  /**
+   * ISO timestamp after which the room is automatically closed. `waiting` and
+   * `playing` rooms keep extending it on activity; terminal rooms keep it
+   * fixed at finish/abort time plus the retention window.
+   */
+  closesAt?: string
   /** Serialized game instance attached to this room while it exists. */
   game?: GameSnapshot
 }
@@ -58,6 +67,8 @@ export interface RoomSummary {
   updatedAt: string
   startedAt?: string
   finishedAt?: string
+  abortedAt?: string
+  closesAt?: string
 }
 
 export type RoomListSocketMessage
@@ -68,6 +79,7 @@ export type RoomListSocketMessage
 export type RoomDetailSocketMessage
   = { type: 'error', message: string }
     | { type: 'snapshot' | 'update', room: Room }
+    | { type: 'closed', room: Room }
     | { type: 'event', room: Room, event: RoomEvent }
 
 export function toRoomSummary(room: Room): RoomSummary {
@@ -88,5 +100,7 @@ export function toRoomSummary(room: Room): RoomSummary {
     updatedAt: room.updatedAt,
     startedAt: room.startedAt,
     finishedAt: room.finishedAt,
+    abortedAt: room.abortedAt,
+    closesAt: room.closesAt,
   }
 }

@@ -60,6 +60,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-08-14',
 
   nitro: {
+    scheduledTasks: {
+      '*/1 * * * *': ['rooms:cleanup'],
+    },
     esbuild: {
       options: {
         target: 'esnext',
@@ -71,6 +74,7 @@ export default defineNuxtConfig({
       ignore: ['/hi'],
     },
     experimental: {
+      tasks: true,
       websocket: true,
       asyncContext: true,
     },

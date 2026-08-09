@@ -8,7 +8,7 @@
  * layer never needs to know the rules of any specific game.
  */
 
-export type GameStatus = 'waiting' | 'playing' | 'finished'
+export type GameStatus = 'waiting' | 'playing' | 'finished' | 'aborted'
 
 export interface GamePlayer {
   sessionId: string

@@ -44,6 +44,13 @@ const statusMeta: Record<RoomSummary['status'], {
     accent: 'bg-hover',
     progress: 'bg-hover',
   },
+  aborted: {
+    color: 'error',
+    label: 'Aborted',
+    icon: 'i-carbon-stop-outline',
+    accent: 'bg-error-400',
+    progress: 'bg-error-500',
+  },
 }
 
 const slots = computed<Array<{ side: GameSide, player: RoomSummary['players'][number] | null }>>(() => {
@@ -65,7 +72,16 @@ const dateInfo = computed(() => {
     return { label: 'Started', date: startedAt ?? updatedAt }
   if (status === 'finished')
     return { label: 'Finished', date: finishedAt ?? updatedAt }
+  if (status === 'aborted')
+    return { label: 'Aborted', date: props.room.abortedAt ?? updatedAt }
   return { label: 'Updated', date: updatedAt }
+})
+
+const closesInLabel = computed(() => {
+  if (!props.room.closesAt)
+    return null
+  const minutes = Math.max(1, Math.ceil((new Date(props.room.closesAt).getTime() - Date.now()) / 60_000))
+  return `Closes in ~${minutes}m`
 })
 </script>
 
@@ -183,6 +199,9 @@ const dateInfo = computed(() => {
           :colorize="true"
           :live="room.status === 'playing'"
         />
+        <span v-if="closesInLabel" class="color-muted shrink-0">
+          · {{ closesInLabel }}
+        </span>
       </span>
       <span class="text-mini color-muted flex shrink-0 gap-1 items-center">
         <span class="i-carbon-view" aria-hidden="true" />

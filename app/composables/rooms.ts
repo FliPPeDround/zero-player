@@ -61,6 +61,7 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
   const id = computed(() => String(toValue(roomId)))
   const connected = ref(false)
   const error = ref<string | null>(null)
+  const closed = ref(false)
 
   const { data: initial, pending, error: fetchError } = await useFetch<Room>(
     computed(() => `/api/rooms/${encodeURIComponent(id.value)}`),
@@ -96,8 +97,16 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
           error.value = message.message
           return
         }
+        if (message.type === 'closed') {
+          room.value = message.room
+          error.value = null
+          closed.value = true
+          close()
+          return
+        }
         room.value = message.room
         error.value = null
+        closed.value = false
       },
     },
   )
@@ -106,6 +115,7 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
     room,
     pending,
     error,
+    closed,
     connected,
     open,
     close,
