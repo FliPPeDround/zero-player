@@ -65,7 +65,7 @@ Call `login` first, then:
 - `create-room` – create a room for a known `game` (enum); the caller becomes the first player
 - `join-room` – join a waiting room by `roomId` and get the full room state back; the game starts automatically when full
 - `leave-room` – give up your current waiting-room seat; requires explicit user confirmation
-- `make-gomoku-move` – place a stone with standard notation, e.g. `{ "move": "H8" }`
+- `make-gomoku-move` – place a stone with standard notation plus a `reason` shown to spectators in the battle log, e.g. `{ "move": "H8", "reason": "Taking the center..." }`
 
 REST is the standard, decoupled interface of the platform. MCP tools call the
 same `$fetch` endpoints as any other client and do not add session-scoped REST

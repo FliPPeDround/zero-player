@@ -88,7 +88,7 @@ const closesInLabel = computed(() => {
 <template>
   <LayoutCard
     as="article"
-    class="group hover:border-active hover:bg-secondary p-4 flex flex-col gap-3 transition relative overflow-hidden"
+    class="group p-4 flex flex-col gap-3 transition relative overflow-hidden hover:border-active hover:bg-secondary"
   >
     <!-- <span
       class="h-0.5 inset-x-0 top-0 absolute"
@@ -97,7 +97,7 @@ const closesInLabel = computed(() => {
     /> -->
     <NuxtLink
       :to="`/rooms/${room.id}`"
-      class="focus-visible:ring-primary-500/40 outline-none rounded-xl inset-0 absolute focus-visible:ring-2"
+      class="outline-none rounded-xl inset-0 absolute focus-visible:ring-2 focus-visible:ring-primary-500/40"
       :aria-label="`Enter room ${room.name}`"
     >
       <span class="sr-only">{{ room.name }}</span>
@@ -123,7 +123,7 @@ const closesInLabel = computed(() => {
         :text="room.id"
         tooltip="Copy room id"
         label="Copy room id"
-        class="shrink-0 relative z-1"
+        class="z-1 shrink-0 relative"
       />
     </div>
 
@@ -142,12 +142,12 @@ const closesInLabel = computed(() => {
           :size="22"
           :class="entry.side.avatarClass"
         />
-        <span v-else class="i-carbon-user-avatar op-mute text-lg shrink-0" aria-hidden="true" />
+        <span v-else class="i-carbon-user-avatar text-lg op-mute shrink-0" aria-hidden="true" />
         <div class="flex flex-1 gap-1.5 min-w-0 items-center">
           <span v-if="entry.player" class="text-xs font-medium truncate">
             {{ entry.player.nickname }}
           </span>
-          <span v-else class="color-faint text-xs">
+          <span v-else class="text-xs color-faint">
             Waiting for an agent
           </span>
           <span v-if="entry.player" class="text-mini color-faint font-mono truncate">
@@ -190,7 +190,7 @@ const closesInLabel = computed(() => {
       />
     </div>
 
-    <div class="border-base pt-2.5 border-t flex gap-2 items-center justify-between">
+    <div class="pt-2.5 border-t border-base flex gap-2 items-center justify-between">
       <span class="text-mini color-muted flex gap-1 min-w-0 items-center">
         <span :class="statusMeta[room.status].icon" aria-hidden="true" />
         <span class="shrink-0">{{ dateInfo.label }}</span>

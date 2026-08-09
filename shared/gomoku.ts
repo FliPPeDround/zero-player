@@ -21,6 +21,8 @@ export interface GomokuAction extends GameActionRecord {
   type: 'place'
   x: number
   y: number
+  /** Optional agent-provided explanation shown to spectators in the battle log. */
+  reason?: string
 }
 
 export interface GomokuState {

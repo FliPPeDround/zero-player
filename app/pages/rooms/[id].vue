@@ -3,6 +3,7 @@ import type { GomokuState } from '#shared/gomoku'
 import type { RoomEvent } from '#shared/rooms'
 import { getGame, getGameName } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
+import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
@@ -22,6 +23,7 @@ onMounted(open)
 onUnmounted(close)
 
 const gameName = computed(() => room.value ? getGameName(room.value.gameId) : '')
+const gameDescription = computed(() => room.value ? getGame(room.value.gameId)?.description ?? '' : '')
 const gameIcon = computed(() => room.value ? getGame(room.value.gameId)?.icon : '')
 const gameSides = computed(() => room.value ? getGame(room.value.gameId)?.sides ?? [] : [])
 const firstSide = computed(() => gameSides.value[0])
@@ -90,14 +92,39 @@ const statusMeta = {
   aborted: { color: 'error', label: 'Aborted' },
 } as const
 
-const eventMeta: Record<RoomEvent['type'], { color: string | false, label: string, icon: string }> = {
-  player_joined: { color: 'success', label: 'Joined', icon: 'i-carbon-user-follow' },
-  player_left: { color: 'warning', label: 'Left', icon: 'i-carbon-user-minus' },
-  game_started: { color: 'primary', label: 'Started', icon: 'i-carbon-play' },
-  move: { color: 'blue', label: 'Move', icon: 'i-carbon-move' },
-  game_finished: { color: false, label: 'Finished', icon: 'i-carbon-flag' },
-  game_aborted: { color: 'error', label: 'Aborted', icon: 'i-carbon-stop-outline' },
-  room_closed: { color: false, label: 'Closed', icon: 'i-carbon-close-outline' },
+const eventMeta: Record<RoomEvent['type'], { label: string, icon: string }> = {
+  player_joined: { label: 'Joined', icon: 'i-carbon-user-follow' },
+  player_left: { label: 'Left', icon: 'i-carbon-user-minus' },
+  game_started: { label: 'Game started', icon: 'i-carbon-play' },
+  move: { label: 'Move', icon: 'i-carbon-move' },
+  game_finished: { label: 'Game finished', icon: 'i-carbon-flag' },
+  game_aborted: { label: 'Game aborted', icon: 'i-carbon-stop-outline' },
+  room_closed: { label: 'Room closed', icon: 'i-carbon-close-outline' },
+}
+
+/**
+ * Lifecycle events render as full-width marker bands that split the feed into
+ * phases (lobby chatter, moves, result). Everything else is quiet chatter.
+ */
+const markerTypes = new Set<RoomEvent['type']>(['game_started', 'game_finished', 'game_aborted'])
+
+/** Score-sheet numbering: `#1`, `#2`, ... counting only move events. */
+const moveNumbers = computed(() => {
+  const numbers = new Map<string, number>()
+  let count = 0
+  for (const event of room.value?.events ?? []) {
+    if (event.type === 'move')
+      numbers.set(event.id, (count += 1))
+  }
+  return numbers
+})
+
+function chatterVerb(event: RoomEvent): string {
+  if (event.type === 'player_joined')
+    return 'joined'
+  if (event.type === 'player_left')
+    return 'left'
+  return eventMeta[event.type].label
 }
 
 const players = computed(() => {
@@ -110,6 +137,19 @@ const firstPlayer = computed(() => (
 const secondPlayer = computed(() => (
   players.value.find(player => player.slot === secondSide.value?.key) ?? null
 ))
+
+/** Every event carries the mover's seat (`payload.side`), so the avatar tint is a direct lookup. */
+function moveAvatarClass(event: RoomEvent): string {
+  const side = event.payload?.side
+  if (typeof side !== 'string')
+    return ''
+  return gameSides.value.find(sideDef => sideDef.key === side)?.avatarClass ?? ''
+}
+
+const winnerDotClass = computed(() => {
+  const winner = players.value.find(player => player.nickname === room.value?.winner)
+  return gameSides.value.find(side => side.key === winner?.slot)?.dotClass ?? ''
+})
 
 const logRef = ref<HTMLElement | null>(null)
 watch(() => room.value?.events.length, () => {
@@ -127,37 +167,33 @@ useHead({
 <template>
   <div class="flex flex-col gap-4">
     <LayoutCard :padding="false" class="min-w-0">
-      <div class="px-3 py-2 flex flex-wrap gap-3 items-center justify-between">
-        <div class="flex flex-wrap gap-x-3 gap-y-2 min-w-0 items-center">
-          <NuxtLink
-            to="/"
-            class="color-muted flex shrink-0 gap-1 transition items-center hover:color-base"
-            aria-label="Back to lobby"
-          >
-            <span class="i-carbon-arrow-left" aria-hidden="true" />
-            <span class="text-sm hidden sm:inline">Lobby</span>
-          </NuxtLink>
-          <h1 class="text-base font-semibold min-w-0 truncate">
-            {{ room?.name ?? 'Room' }}
-          </h1>
-          <template v-if="room">
-            <span class="text-mini color-muted font-mono truncate">{{ room.id }}</span>
+      <div class="px-4 py-3 flex flex-wrap gap-x-4 gap-y-2 items-center justify-between">
+        <div class="flex flex-col gap-1 min-w-0">
+          <div class="flex flex-wrap gap-x-3 gap-y-1 min-w-0 items-center">
+            <ActionIconButton
+              as="RouterLink"
+              to="/"
+              icon="i-carbon-arrow-left"
+              tooltip="Back to lobby"
+              label="Back to lobby"
+              class="text-base shrink-0"
+            />
+            <h1 class="text-base font-semibold min-w-0 truncate">
+              {{ room?.name ?? 'Room' }}
+            </h1>
+          </div>
+          <div v-if="room" class="text-mini color-muted font-mono flex gap-1.5 min-w-0 items-center">
+            <span class="truncate">{{ room.id }}</span>
             <CopyButton
               :text="room.id"
               tooltip="Copy room id"
               label="Copy room id"
               class="shrink-0"
             />
-          </template>
-          <div v-if="room" class="flex flex-wrap gap-2 min-w-0 items-center">
-            <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" />
-            <DisplayBadge
-              :text="statusMeta[room.status].label"
-              :color="statusMeta[room.status].color"
-            />
           </div>
         </div>
-        <div v-if="room" class="flex shrink-0 gap-1.5 items-center">
+        <div v-if="room" class="flex shrink-0 flex-col gap-1 items-end">
+          <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" />
           <span class="text-xs color-muted flex gap-1 items-center">
             <span class="i-carbon-view" aria-hidden="true" />
             <DisplayNumber :value="room.spectatorCount" />
@@ -324,22 +360,29 @@ useHead({
           <LayoutCard class="flex flex-col gap-3">
             <LayoutSeparator label="Match info" />
             <DisplayKeyValue label="Game" :value="gameName" />
-            <DisplayKeyValue label="Agents" :value="`${room.players.length}/${room.maxPlayers}`" />
-            <DisplayKeyValue label="Spectators" :value="room.spectatorCount" />
-            <DisplayKeyValue label="Created">
-              <DisplayDate :date="room.createdAt" />
+            <p class="text-mini color-muted -mt-1.5">
+              {{ gameDescription }}
+            </p>
+            <DisplayKeyValue label="Status">
+              <DisplayBadge
+                :text="statusMeta[room.status].label"
+                :color="statusMeta[room.status].color"
+              />
             </DisplayKeyValue>
-            <DisplayKeyValue v-if="room.startedAt" label="Started">
-              <DisplayDate :date="room.startedAt" />
+            <DisplayKeyValue label="Moves">
+              <span class="flex gap-1.5 items-baseline">
+                <DisplayNumber :value="room.game?.moveCount ?? 0" />
+                <span v-if="lastMoveLabel" class="text-mini color-faint font-mono">
+                  {{ lastMoveLabel }}
+                </span>
+              </span>
             </DisplayKeyValue>
-            <DisplayKeyValue v-if="room.finishedAt" label="Finished">
-              <DisplayDate :date="room.finishedAt" />
+            <DisplayKeyValue label="Last activity">
+              <DisplayDate :date="room.updatedAt" :live="room.status === 'playing'" />
             </DisplayKeyValue>
-            <DisplayKeyValue v-if="room.abortedAt" label="Aborted">
-              <DisplayDate :date="room.abortedAt" />
-            </DisplayKeyValue>
+            <DisplayKeyValue v-if="room.status === 'finished' && room.winner" label="Winner" :value="room.winner" />
             <DisplayKeyValue
-              v-if="closesInLabel && (room.status === 'finished' || room.status === 'aborted')"
+              v-if="closesInLabel"
               label="Auto-closes"
             >
               <span class="text-mini color-muted">{{ closesInLabel }}</span>
@@ -347,63 +390,121 @@ useHead({
           </LayoutCard>
 
           <LayoutCard :padding="false" class="flex flex-1 flex-col min-h-0 min-w-0">
-            <div class="px-4 py-2 border-b border-base flex items-center justify-between">
+            <div class="px-3 py-2 border-b border-base flex items-center">
               <div class="flex gap-2 items-center">
                 <h2 class="text-sm font-medium">
                   Battle log
                 </h2>
                 <DisplayNumberBadge :value="room.events.length" />
               </div>
-              <DisplayBadge v-if="room.status === 'playing'" text="Live" color="success" rounded="full" />
             </div>
             <div class="lg:flex-1 lg:min-h-0 lg:relative">
-              <div ref="logRef" class="h-[420px] overflow-y-auto lg:inset-0 lg:absolute">
+              <div ref="logRef" class="scroll-fade-y h-[420px] overflow-y-auto lg:inset-0 lg:absolute">
                 <ol v-if="room.events.length" class="py-1">
                   <li
                     v-for="event in room.events"
                     :key="event.id"
-                    class="text-sm px-4 py-2 border-b border-mute flex gap-3 items-start last:border-0"
+                    class="first:border-t-0"
+                    :class="{ 'border-t border-mute': markerTypes.has(event.type) }"
                   >
-                    <DisplayBadge
-                      :text="eventMeta[event.type].label"
-                      :color="eventMeta[event.type].color"
-                      :icon="eventMeta[event.type].icon"
-                      rounded="full"
-                      class="mt-0.5 shrink-0"
-                    />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex gap-2 items-baseline justify-between">
-                        <span class="font-medium truncate">
-                          {{ event.actor ?? eventMeta[event.type].label }}
-                        </span>
-                        <DisplayDate
-                          :date="event.at"
-                          :live="room.status === 'playing'"
-                          class="text-xs shrink-0"
-                        />
+                    <!-- Move: identity and move share one header line; the reason sits below -->
+                    <div
+                      v-if="event.type === 'move' && event.payload"
+                      class="px-3 py-2 flex gap-2.5"
+                    >
+                      <DisplayAvatar
+                        :name="event.actor ?? eventMeta.move.label"
+                        :size="22"
+                        class="mt-0.5 shrink-0"
+                        :class="[moveAvatarClass(event)]"
+                      />
+                      <div class="flex-1 min-w-0">
+                        <div class="flex gap-x-1.5 min-w-0 items-center">
+                          <span class="text-compact color-base font-medium min-w-0 truncate">
+                            {{ event.actor ?? eventMeta.move.label }}
+                          </span>
+                          <span class="text-mini color-faint shrink-0" aria-hidden="true">·</span>
+                          <DisplayNumberBadge
+                            :value="moveNumbers.get(event.id) ?? 0"
+                            prefix="#"
+                            class="shrink-0"
+                          />
+                          <template v-if="event.payload.type === 'place'">
+                            <span class="text-sm color-base font-medium font-mono shrink-0">
+                              {{ moveLabel(event.payload) }}
+                            </span>
+                          </template>
+                          <template v-else>
+                            <span class="text-sm color-base font-medium font-mono shrink-0">
+                              {{ event.payload.move }}
+                            </span>
+                          </template>
+                          <span class="flex-1" aria-hidden="true" />
+                          <DisplayDate
+                            :date="event.at"
+                            :live="room.status === 'playing'"
+                            class="text-mini color-faint shrink-0"
+                          />
+                        </div>
+                        <div
+                          v-if="event.payload.type !== 'place'"
+                          class="text-mini color-faint font-mono mt-0.5 tabular-nums"
+                        >
+                          power {{ event.payload.power }} · score {{ event.payload.score }}
+                        </div>
+                        <p
+                          v-if="typeof event.payload.reason === 'string' && event.payload.reason"
+                          class="text-compact color-muted mt-1 pl-2 border-l border-mute whitespace-pre-wrap break-words"
+                        >
+                          {{ event.payload.reason }}
+                        </p>
                       </div>
-                      <div
-                        v-if="event.type === 'move' && event.payload"
-                        class="text-xs color-muted font-mono mt-0.5"
-                      >
-                        <template v-if="event.payload.type === 'place'">
-                          {{ moveLabel(event.payload) }}
-                          <span class="op-fade">({{ event.payload.x }}, {{ event.payload.y }})</span>
+                    </div>
+                    <!-- Lifecycle markers: quiet bands that split the feed into phases -->
+                    <div
+                      v-else-if="markerTypes.has(event.type)"
+                      class="text-compact px-3 py-1.5 bg-secondary flex gap-2.5 items-center"
+                    >
+                      <span class="color-muted flex shrink-0 w-[22px] justify-center" aria-hidden="true">
+                        <span :class="eventMeta[event.type].icon" />
+                      </span>
+                      <p class="color-muted flex-1 min-w-0 truncate">
+                        <template v-if="event.type === 'game_finished'">
+                          <span
+                            v-if="winnerDotClass"
+                            class="mr-1 rounded-full h-2 w-2 inline-block"
+                            :class="winnerDotClass"
+                            aria-hidden="true"
+                          />
+                          <span class="color-base font-medium">{{ room.winner ? `${room.winner} won` : 'Draw' }}</span>
+                          <span v-if="room.game?.finishReason" class="text-mini color-faint font-mono"> · {{ room.game.finishReason }}</span>
                         </template>
                         <template v-else>
-                          {{ event.payload.move }}
-                          · power {{ event.payload.power }}
-                          · score {{ event.payload.score }}
+                          {{ eventMeta[event.type].label }}
                         </template>
-                      </div>
-                      <div
-                        v-else-if="event.type === 'game_finished'"
-                        class="text-xs color-muted font-mono mt-0.5"
-                      >
-                        {{ room.winner ?? 'Draw' }}<template v-if="room.game?.finishReason">
-                          · {{ room.game.finishReason }}
-                        </template>
-                      </div>
+                      </p>
+                      <DisplayDate
+                        :date="event.at"
+                        :live="room.status === 'playing'"
+                        class="text-mini color-faint shrink-0"
+                      />
+                    </div>
+                    <!-- Chatter: joins/leaves recede to faint one-liners -->
+                    <div
+                      v-else
+                      class="text-mini px-3 py-1 flex gap-2.5 items-center"
+                    >
+                      <span class="op-fade flex shrink-0 w-[22px] justify-center" aria-hidden="true">
+                        <span :class="eventMeta[event.type].icon" />
+                      </span>
+                      <p class="color-muted flex-1 min-w-0 truncate">
+                        <span v-if="event.actor" class="color-base font-medium">{{ event.actor }}</span> {{ chatterVerb(event) }}
+                      </p>
+                      <DisplayDate
+                        :date="event.at"
+                        :live="room.status === 'playing'"
+                        class="color-faint shrink-0"
+                      />
                     </div>
                   </li>
                 </ol>

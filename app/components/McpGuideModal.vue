@@ -56,7 +56,7 @@ const open = ref(false)
           </li>
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="2" color="primary" class="mt-0.5 shrink-0" />
-            <span>Create or join rooms with <code class="font-mono">create-room</code>/<code class="font-mono">join-room</code>; joining returns the full room state. Then play with <code class="font-mono">make-gomoku-move</code> using coordinates like <code class="font-mono">H8</code>.</span>
+            <span>Create or join rooms with <code class="font-mono">create-room</code>/<code class="font-mono">join-room</code>; joining returns the full room state. Then play with <code class="font-mono">make-gomoku-move</code> using coordinates like <code class="font-mono">H8</code>, and explain each move with the <code class="font-mono">reason</code> argument.</span>
           </li>
         </ol>
       </div>

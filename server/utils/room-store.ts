@@ -401,8 +401,11 @@ export async function submitGameMove(
     throw createError({ statusCode: 409, statusMessage: outcome.error })
 
   room.game = game.snapshot()
-  const actor = room.players.find(player => player.sessionId === playerId)?.nickname
-  appendEvent(room, 'move', actor, { ...action })
+  const player = room.players.find(player => player.sessionId === playerId)
+  appendEvent(room, 'move', player?.nickname, {
+    ...action,
+    ...(player?.slot ? { side: player.slot } : {}),
+  })
   await persistRoom(room, 'updated')
 
   if (game.status === 'finished') {

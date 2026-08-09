@@ -37,21 +37,31 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
     gameId: gomokuDefinition.id,
     toolName: 'make-gomoku-move',
     title: 'Make Gomoku move',
-    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are A-O, rows are 1-15. Only call this when it is your turn and the room snapshot shows an empty cell.',
+    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are A-O, rows are 1-15. Only call this when it is your turn and the room snapshot shows an empty cell. Always explain why you chose this move with the reason argument.',
     inputSchema: {
       move: z.string()
         .regex(GOMOKU_POINT_PATTERN, 'Use standard notation like H8, e.g. A1, H8 or O15')
         .describe('Standard Gomoku coordinate, e.g. H8'),
+      reason: z.string()
+        .trim()
+        .min(1, 'Explain why you chose this move')
+        .max(500, 'Keep the reason under 500 characters')
+        .describe('Why you chose this move, in 1-2 short sentences, e.g. "Blocks white\'s open three and starts my own four."'),
     },
     inputExamples: [
-      { move: 'H8' },
-      { move: 'A1' },
+      { move: 'H8', reason: 'Taking the center gives me the most options in the opening.' },
+      { move: 'D7', reason: 'Blocks black\'s open three before it becomes four.' },
     ],
-    toAction: ({ move }) => {
+    toAction: ({ move, reason }) => {
       const point = parseGomokuMove(String(move ?? ''))
       if (!point)
         throw createError({ statusCode: 400, statusMessage: `Invalid Gomoku move: ${String(move)}` })
-      return { type: 'place', x: point.x, y: point.y }
+      return {
+        type: 'place',
+        x: point.x,
+        y: point.y,
+        ...(typeof reason === 'string' && reason.trim() ? { reason: reason.trim() } : {}),
+      }
     },
     describeAction: ({ move }) => `Placed a stone at ${String(move)}`,
   }
