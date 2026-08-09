@@ -1,17 +1,26 @@
 import type { GameActionRecord, GamePlayer } from '#shared/game'
 import type { Room } from '#shared/rooms'
-import type { BaseGame } from './BaseGame'
+import type { BaseGame, GameMcpMoveDefinition } from './BaseGame'
 import { GomokuGame } from './GomokuGame'
 
 type GameConstructor<
   TAction extends GameActionRecord = GameActionRecord,
   TState = unknown,
-> = new (roomId: string, players: GamePlayer[]) => BaseGame<TAction, TState>
+> = (new (roomId: string, players: GamePlayer[]) => BaseGame<TAction, TState>) & {
+  /**
+   * MCP is the primary way agents play, so every registered game must expose
+   * its move tool contract; the one-line file under `server/mcp/tools/games/`
+   * registers it.
+   */
+  readonly mcpMoveDefinition: GameMcpMoveDefinition
+}
 
 /**
  * Maps a registered game id to its engine. The room system goes through this
- * registry exclusively, so adding a game is: implement BaseGame, register it,
- * declare it in shared/games.ts.
+ * registry exclusively, so adding a game is: define it next to its shared
+ * module (e.g. `gomokuDefinition` in `shared/gomoku.ts`), implement BaseGame
+ * with that definition plus its static `mcpMoveDefinition`, register the
+ * class here.
  */
 const GAME_REGISTRY: Record<string, GameConstructor> = {
   gomoku: GomokuGame,

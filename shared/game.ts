@@ -13,7 +13,7 @@ export type GameStatus = 'waiting' | 'playing' | 'finished'
 export interface GamePlayer {
   sessionId: string
   nickname: string
-  slot: 'red' | 'blue'
+  slot: string
 }
 
 export interface GameActionRecord {

@@ -1,3 +1,3 @@
-import { defineGameMcpTool, GAME_MCP_MOVE_DEFINITIONS } from '../../../games/mcp'
+import { GomokuGame } from '../../../games/GomokuGame'
 
-export default defineGameMcpTool(GAME_MCP_MOVE_DEFINITIONS.gomoku!)
+export default GomokuGame.defineMcpMoveTool(GomokuGame.mcpMoveDefinition)

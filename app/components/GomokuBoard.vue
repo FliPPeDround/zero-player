@@ -31,8 +31,7 @@ let gridGroup: Group | null = null
 let stoneLayer: Group | null = null
 let markerLayer: Group | null = null
 let lastMoveMarker: Ellipse | null = null
-let winLineNode: Line | null = null
-let winRings: Ellipse[] = []
+let winMarkers: Ellipse[] = []
 let resizeObserver: ResizeObserver | null = null
 let size = 0
 let disposed = false
@@ -162,7 +161,11 @@ function updateLastMoveMarker(): void {
   }
 
   const last = state.value?.lastMove
-  if (!last)
+  const winLine = props.game?.finishDetails?.winLine
+  const isWinningMove = Array.isArray(winLine)
+    && last != null
+    && winLine.some(point => point.x === last.x && point.y === last.y)
+  if (!last || isWinningMove)
     return
 
   const { cx, cy, radius } = stoneMetrics(last.x, last.y)
@@ -180,49 +183,32 @@ function updateLastMoveMarker(): void {
 function updateWinLine(): void {
   if (!markerLayer)
     return
-  if (winLineNode) {
-    markerLayer.remove(winLineNode)
-    winLineNode = null
-  }
-  for (const ring of winRings)
-    markerLayer.remove(ring)
-  winRings = []
+  for (const marker of winMarkers)
+    markerLayer.remove(marker)
+  winMarkers = []
 
   const rawLine = props.game?.finishDetails?.winLine
   const line = Array.isArray(rawLine) ? rawLine as GomokuPoint[] : null
   if (!line || line.length < 2)
     return
 
-  const first = stoneMetrics(line[0]!.x, line[0]!.y)
-  const last = stoneMetrics(line.at(-1)!.x, line.at(-1)!.y)
-  const highlight = boardColor('--board-accent', '#e5484d')
-
-  winLineNode = new LineClass({
-    points: [first.cx, first.cy, last.cx, last.cy],
-    stroke: highlight,
-    strokeWidth: Math.max(2, first.cell * 0.09),
-    strokeCap: 'round',
-    opacity: 0.65,
-  })
-  markerLayer.add(winLineNode)
+  const highlight = boardColor('--board-win', '#39732e')
 
   for (const point of line) {
     const { cx, cy, radius } = stoneMetrics(point.x, point.y)
-    const ringRadius = radius * 1.18
-    winRings.push(new EllipseClass({
-      x: cx,
-      y: cy,
-      width: ringRadius * 2,
-      height: ringRadius * 2,
-      innerRadius: 0.45,
+    const dotRadius = radius * 0.3
+    winMarkers.push(new EllipseClass({
+      x: cx - dotRadius,
+      y: cy - dotRadius,
+      width: dotRadius * 2,
+      height: dotRadius * 2,
       fill: highlight,
       opacity: 0.85,
-      around: 'center',
     }))
   }
 
-  for (const ring of winRings)
-    markerLayer.add(ring)
+  for (const marker of winMarkers)
+    markerLayer.add(marker)
 }
 
 function renderBoard(animate: boolean): void {
@@ -278,13 +264,9 @@ function resetBoard(): void {
     markerLayer?.remove(lastMoveMarker)
     lastMoveMarker = null
   }
-  if (winLineNode) {
-    markerLayer?.remove(winLineNode)
-    winLineNode = null
-  }
-  for (const ring of winRings)
-    markerLayer?.remove(ring)
-  winRings = []
+  for (const marker of winMarkers)
+    markerLayer?.remove(marker)
+  winMarkers = []
   renderBoard(false)
 }
 
@@ -365,25 +347,9 @@ watch(() => colorMode.value, () => {
       </span>
       <span
         v-for="index in GOMOKU_SIZE"
-        :key="`bottom-${index}`"
-        class="board-label text-micro color-faint font-mono"
-        :style="{ left: `${linePositionRatio(index - 1) * 100}%`, top: `${(1 - BOARD_LABEL_RATIO) * 100}%` }"
-      >
-        {{ gomokuColumnLabel(index - 1) }}
-      </span>
-      <span
-        v-for="index in GOMOKU_SIZE"
         :key="`left-${index}`"
         class="board-label text-micro color-faint font-mono"
         :style="{ left: `${BOARD_LABEL_RATIO * 100}%`, top: `${linePositionRatio(index - 1) * 100}%` }"
-      >
-        {{ index }}
-      </span>
-      <span
-        v-for="index in GOMOKU_SIZE"
-        :key="`right-${index}`"
-        class="board-label text-micro color-faint font-mono"
-        :style="{ left: `${(1 - BOARD_LABEL_RATIO) * 100}%`, top: `${linePositionRatio(index - 1) * 100}%` }"
       >
         {{ index }}
       </span>
@@ -400,6 +366,7 @@ watch(() => colorMode.value, () => {
   --board-black-stroke: rgba(255, 255, 255, 0.35);
   --board-white-stroke: rgba(0, 0, 0, 0.18);
   --board-accent: #e5484d;
+  --board-win: var(--colors-primary-600);
 }
 
 :global(html.dark .board-surface) {
@@ -409,6 +376,7 @@ watch(() => colorMode.value, () => {
   --board-white: #f2f1ed;
   --board-black-stroke: rgba(255, 255, 255, 0.45);
   --board-white-stroke: rgba(0, 0, 0, 0.3);
+  --board-win: var(--colors-primary-300);
 }
 
 .board-labels {

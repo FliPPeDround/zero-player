@@ -43,7 +43,6 @@ const filteredRooms = computed(() => {
     return [
       room.name,
       room.id,
-      room.mode,
       room.gameId,
       getGameName(room.gameId),
       ...room.players.map(player => player.nickname),

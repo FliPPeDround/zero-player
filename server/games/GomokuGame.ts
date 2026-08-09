@@ -1,13 +1,17 @@
 import type { GamePlayer, GameResult, PlayedAction } from '#shared/game'
 import type { GomokuAction, GomokuCell, GomokuPoint, GomokuState } from '#shared/gomoku'
+import type { GameMcpMoveDefinition } from './BaseGame'
 import {
   GOMOKU_BLACK,
   GOMOKU_CELLS,
   GOMOKU_EMPTY,
   GOMOKU_SIZE,
   GOMOKU_WHITE,
+  gomokuDefinition,
   gomokuIndex,
+  parseGomokuMove,
 } from '#shared/gomoku'
+import { z } from 'zod'
 import { BaseGame } from './BaseGame'
 
 const DIRECTIONS = [
@@ -17,13 +21,40 @@ const DIRECTIONS = [
   { dx: 1, dy: -1 },
 ] as const
 
+const GOMOKU_POINT_PATTERN = /^[a-o]([1-9]|1[0-5])$/i
+
 /**
  * Gomoku on a standard 15x15 board. Black (first seat) starts, players
  * alternate, and the first player to make an unbroken run of five or more
  * stones wins. A full board with no winner is a draw.
  */
 export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
-  readonly gameId = 'gomoku'
+  readonly gameId = gomokuDefinition.id
+
+  readonly definition = gomokuDefinition
+
+  static readonly mcpMoveDefinition: GameMcpMoveDefinition = {
+    gameId: gomokuDefinition.id,
+    toolName: 'make-gomoku-move',
+    title: 'Make Gomoku move',
+    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are A-O, rows are 1-15. Only call this when it is your turn and the room snapshot shows an empty cell.',
+    inputSchema: {
+      move: z.string()
+        .regex(GOMOKU_POINT_PATTERN, 'Use standard notation like H8, e.g. A1, H8 or O15')
+        .describe('Standard Gomoku coordinate, e.g. H8'),
+    },
+    inputExamples: [
+      { move: 'H8' },
+      { move: 'A1' },
+    ],
+    toAction: ({ move }) => {
+      const point = parseGomokuMove(String(move ?? ''))
+      if (!point)
+        throw createError({ statusCode: 400, statusMessage: `Invalid Gomoku move: ${String(move)}` })
+      return { type: 'place', x: point.x, y: point.y }
+    },
+    describeAction: ({ move }) => `Placed a stone at ${String(move)}`,
+  }
 
   createInitialState(): GomokuState {
     return { board: Array.from<GomokuCell>({ length: GOMOKU_CELLS }).fill(GOMOKU_EMPTY) }

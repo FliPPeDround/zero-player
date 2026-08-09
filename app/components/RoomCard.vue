@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { GameSide } from '#shared/games'
 import type { RoomSummary } from '#shared/rooms'
-import { getGame, getGameName, getSideMeta } from '#shared/games'
+import { getGame, getGameName } from '#shared/games'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
@@ -14,10 +15,6 @@ const props = defineProps<{
 
 const gameName = computed(() => getGameName(props.room.gameId))
 const gameIcon = computed(() => getGame(props.room.gameId)?.icon)
-
-function sideMeta(slot: 'red' | 'blue') {
-  return getSideMeta(props.room.gameId, slot)
-}
 
 const statusMeta: Record<RoomSummary['status'], {
   color: string | false
@@ -49,12 +46,11 @@ const statusMeta: Record<RoomSummary['status'], {
   },
 }
 
-const slots = computed<Array<{ slot: 'red' | 'blue', player: RoomSummary['players'][number] | null }>>(() => {
-  if (props.room.mode !== '1v1')
-    return []
-  return (['red', 'blue'] as const).map(slot => ({
-    slot,
-    player: props.room.players.find(player => player.slot === slot) ?? null,
+const slots = computed<Array<{ side: GameSide, player: RoomSummary['players'][number] | null }>>(() => {
+  const sides = getGame(props.room.gameId)?.sides ?? []
+  return sides.map(side => ({
+    side,
+    player: props.room.players.find(player => player.slot === side.key) ?? null,
   }))
 })
 
@@ -76,7 +72,7 @@ const dateInfo = computed(() => {
 <template>
   <LayoutCard
     as="article"
-    class="group p-4 flex flex-col gap-3 transition relative overflow-hidden hover:border-active hover:bg-secondary"
+    class="group hover:border-active hover:bg-secondary p-4 flex flex-col gap-3 transition relative overflow-hidden"
   >
     <!-- <span
       class="h-0.5 inset-x-0 top-0 absolute"
@@ -85,7 +81,7 @@ const dateInfo = computed(() => {
     /> -->
     <NuxtLink
       :to="`/rooms/${room.id}`"
-      class="outline-none rounded-xl inset-0 absolute focus-visible:ring-2 focus-visible:ring-primary-500/40"
+      class="focus-visible:ring-primary-500/40 outline-none rounded-xl inset-0 absolute focus-visible:ring-2"
       :aria-label="`Enter room ${room.name}`"
     >
       <span class="sr-only">{{ room.name }}</span>
@@ -106,37 +102,36 @@ const dateInfo = computed(() => {
 
     <div class="flex gap-2 min-w-0 items-center">
       <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" class="text-mini shrink-0" />
-      <DisplayBadge v-if="room.mode !== '1v1'" :text="room.mode" :color="false" class="text-mini shrink-0" />
       <span class="text-mini color-faint font-mono truncate">{{ room.id }}</span>
       <CopyButton
         :text="room.id"
         tooltip="Copy room id"
         label="Copy room id"
-        class="z-1 shrink-0 relative"
+        class="shrink-0 relative z-1"
       />
     </div>
 
     <div v-if="slots.length" class="flex flex-col gap-1.5">
       <div
         v-for="entry in slots"
-        :key="entry.slot"
+        :key="entry.side.key"
         class="px-2 py-1.5 border rounded-lg flex gap-2 min-w-0 items-center"
         :class="entry.player
-          ? ['border-base', sideMeta(entry.slot).surfaceClass]
+          ? ['border-base', entry.side.surfaceClass]
           : 'border-dashed border-mute'"
       >
         <DisplayAvatar
           v-if="entry.player"
           :name="entry.player.nickname"
           :size="22"
-          :class="sideMeta(entry.slot).avatarClass"
+          :class="entry.side.avatarClass"
         />
-        <span v-else class="i-carbon-user-avatar text-lg op-mute shrink-0" aria-hidden="true" />
+        <span v-else class="i-carbon-user-avatar op-mute text-lg shrink-0" aria-hidden="true" />
         <div class="flex flex-1 gap-1.5 min-w-0 items-center">
           <span v-if="entry.player" class="text-xs font-medium truncate">
             {{ entry.player.nickname }}
           </span>
-          <span v-else class="text-xs color-faint">
+          <span v-else class="color-faint text-xs">
             Waiting for an agent
           </span>
           <span v-if="entry.player" class="text-mini color-faint font-mono truncate">
@@ -145,7 +140,7 @@ const dateInfo = computed(() => {
         </div>
         <span
           class="rounded-full shrink-0 h-1.5 w-1.5"
-          :class="sideMeta(entry.slot).dotClass"
+          :class="entry.side.dotClass"
           aria-hidden="true"
         />
       </div>
@@ -179,7 +174,7 @@ const dateInfo = computed(() => {
       />
     </div>
 
-    <div class="pt-2.5 border-t border-base flex gap-2 items-center justify-between">
+    <div class="border-base pt-2.5 border-t flex gap-2 items-center justify-between">
       <span class="text-mini color-muted flex gap-1 min-w-0 items-center">
         <span :class="statusMeta[room.status].icon" aria-hidden="true" />
         <span class="shrink-0">{{ dateInfo.label }}</span>

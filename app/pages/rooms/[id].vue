@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { GomokuState } from '#shared/gomoku'
 import type { RoomEvent } from '#shared/rooms'
-import { getGame, getGameName, getSideMeta } from '#shared/games'
+import { getGame, getGameName } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
@@ -23,27 +23,23 @@ onUnmounted(close)
 
 const gameName = computed(() => room.value ? getGameName(room.value.gameId) : '')
 const gameIcon = computed(() => room.value ? getGame(room.value.gameId)?.icon : '')
-const isVersus = computed(() => room.value?.mode === '1v1')
+const gameSides = computed(() => room.value ? getGame(room.value.gameId)?.sides ?? [] : [])
+const firstSide = computed(() => gameSides.value[0])
+const secondSide = computed(() => gameSides.value[1])
+const isVersus = computed(() => gameSides.value.length === 2)
 const isGomoku = computed(() => room.value?.gameId === 'gomoku')
-
-function sideMeta(slot: 'red' | 'blue') {
-  return getSideMeta(room.value?.gameId ?? '', slot)
-}
 
 const turnLabel = computed(() => {
   const game = room.value?.game
   if (!game)
     return 'Waiting'
   if (game.status === 'finished') {
-    if (!game.winner)
-      return 'Draw'
-    const winner = game.players.find(player => player.sessionId === game.winner)
-    return `${winner?.nickname ?? 'Unknown'} wins`
+    return game.winner ? 'Finished' : 'Draw'
   }
   if (!game.currentPlayerId)
     return 'Waiting'
-  const isBlack = game.players[0]?.sessionId === game.currentPlayerId
-  return `${isBlack ? 'Black' : 'White'} to move`
+  const index = game.players.findIndex(player => player.sessionId === game.currentPlayerId)
+  return `${gameSides.value[index]?.label ?? `Seat ${index + 1}`} to move`
 })
 
 const turnColor = computed(() => {
@@ -92,8 +88,12 @@ const players = computed(() => {
   return room.value?.players ?? []
 })
 
-const blackPlayer = computed(() => players.value.find(player => player.slot === 'red') ?? null)
-const whitePlayer = computed(() => players.value.find(player => player.slot === 'blue') ?? null)
+const firstPlayer = computed(() => (
+  players.value.find(player => player.slot === firstSide.value?.key) ?? null
+))
+const secondPlayer = computed(() => (
+  players.value.find(player => player.slot === secondSide.value?.key) ?? null
+))
 
 const logRef = ref<HTMLElement | null>(null)
 watch(() => room.value?.events.length, () => {
@@ -135,7 +135,6 @@ useHead({
           </template>
           <div v-if="room" class="flex flex-wrap gap-2 min-w-0 items-center">
             <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" />
-            <DisplayBadge v-if="room.mode !== '1v1'" :text="room.mode" :color="false" />
             <DisplayBadge
               :text="statusMeta[room.status].label"
               :color="statusMeta[room.status].color"
@@ -170,17 +169,19 @@ useHead({
             class="gap-3 grid items-stretch md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
           >
             <RoomPlayerCard
-              :player="blackPlayer"
-              side="red"
-              :highlight="room.status === 'finished' && blackPlayer?.nickname === room.winner"
+              :player="firstPlayer"
+              :label="firstSide?.label ?? 'First'"
+              :color="firstSide?.color ?? false"
+              :highlight="room.status === 'finished' && firstPlayer?.nickname === room.winner"
             />
             <div class="text-sm color-faint font-mono flex items-center self-center justify-center">
               VS
             </div>
             <RoomPlayerCard
-              :player="whitePlayer"
-              side="blue"
-              :highlight="room.status === 'finished' && whitePlayer?.nickname === room.winner"
+              :player="secondPlayer"
+              :label="secondSide?.label ?? 'Second'"
+              :color="secondSide?.color ?? false"
+              :highlight="room.status === 'finished' && secondPlayer?.nickname === room.winner"
             />
           </section>
           <section v-else-if="!isGomoku" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
@@ -201,25 +202,15 @@ useHead({
             />
           </section>
 
-          <section v-if="room.status === 'finished'" class="flex justify-center">
-            <DisplayBadge
-              :text="room.winner ? `${room.winner} wins` : 'Draw'"
-              :color="room.winner ? 'success' : false"
-              variant="solid"
-              rounded="full"
-              class="text-sm px-3 py-1.5"
-            />
-          </section>
-
           <section v-if="isGomoku" class="gap-4 grid">
             <LayoutCard :padding="false" class="min-w-0 overflow-hidden">
               <div class="px-3 py-2 border-b border-base flex flex-wrap gap-x-4 gap-y-2 items-center justify-between">
                 <div class="flex gap-2 min-w-0 items-center">
                   <DisplayAvatar
-                    v-if="blackPlayer"
-                    :name="blackPlayer.nickname"
+                    v-if="firstPlayer"
+                    :name="firstPlayer.nickname"
                     :size="28"
-                    class="shrink-0" :class="[sideMeta('red').avatarClass]"
+                    class="shrink-0" :class="[firstSide?.avatarClass]"
                   />
                   <span
                     v-else
@@ -227,11 +218,20 @@ useHead({
                     aria-hidden="true"
                   />
                   <div class="min-w-0">
-                    <div class="text-sm leading-tight font-medium truncate">
-                      {{ blackPlayer?.nickname ?? 'Black' }}
+                    <div class="flex gap-1.5 min-w-0 items-center">
+                      <span class="text-sm leading-tight font-medium truncate">
+                        {{ firstPlayer?.nickname ?? firstSide?.label ?? 'First' }}
+                      </span>
+                      <DisplayBadge
+                        v-if="firstPlayer && room.status === 'finished' && firstPlayer.nickname === room.winner"
+                        text="Winner"
+                        color="success"
+                        rounded="full"
+                        class="shrink-0"
+                      />
                     </div>
                     <div class="text-mini color-muted leading-tight font-mono truncate">
-                      {{ blackPlayer ? `${blackPlayer.model} · ${blackPlayer.harness}` : 'Waiting' }}
+                      {{ firstPlayer ? `${firstPlayer.model} · ${firstPlayer.harness}` : 'Waiting' }}
                     </div>
                   </div>
                 </div>
@@ -258,18 +258,27 @@ useHead({
 
                 <div class="flex gap-2 min-w-0 items-center justify-end">
                   <div class="text-right min-w-0">
-                    <div class="text-sm leading-tight font-medium truncate">
-                      {{ whitePlayer?.nickname ?? 'White' }}
+                    <div class="flex gap-1.5 min-w-0 items-center justify-end">
+                      <span class="text-sm leading-tight font-medium truncate">
+                        {{ secondPlayer?.nickname ?? secondSide?.label ?? 'Second' }}
+                      </span>
+                      <DisplayBadge
+                        v-if="secondPlayer && room.status === 'finished' && secondPlayer.nickname === room.winner"
+                        text="Winner"
+                        color="success"
+                        rounded="full"
+                        class="shrink-0"
+                      />
                     </div>
                     <div class="text-mini color-muted leading-tight font-mono truncate">
-                      {{ whitePlayer ? `${whitePlayer.model} · ${whitePlayer.harness}` : 'Waiting' }}
+                      {{ secondPlayer ? `${secondPlayer.model} · ${secondPlayer.harness}` : 'Waiting' }}
                     </div>
                   </div>
                   <DisplayAvatar
-                    v-if="whitePlayer"
-                    :name="whitePlayer.nickname"
+                    v-if="secondPlayer"
+                    :name="secondPlayer.nickname"
                     :size="28"
-                    class="shrink-0" :class="[sideMeta('blue').avatarClass]"
+                    class="shrink-0" :class="[secondSide?.avatarClass]"
                   />
                   <span
                     v-else
@@ -285,11 +294,10 @@ useHead({
           </section>
         </div>
 
-        <aside class="flex flex-col gap-4 min-w-0">
+        <aside class="flex flex-col gap-4 min-h-0 min-w-0">
           <LayoutCard class="flex flex-col gap-3">
             <LayoutSeparator label="Match info" />
             <DisplayKeyValue label="Game" :value="gameName" />
-            <DisplayKeyValue v-if="room.mode !== '1v1'" label="Mode" :value="room.mode" />
             <DisplayKeyValue label="Agents" :value="`${room.players.length}/${room.maxPlayers}`" />
             <DisplayKeyValue label="Spectators" :value="room.spectatorCount" />
             <DisplayKeyValue label="Created">
@@ -303,7 +311,7 @@ useHead({
             </DisplayKeyValue>
           </LayoutCard>
 
-          <LayoutCard :padding="false" class="flex flex-1 flex-col min-w-0">
+          <LayoutCard :padding="false" class="flex flex-1 flex-col min-h-0 min-w-0">
             <div class="px-4 py-2 border-b border-base flex items-center justify-between">
               <div class="flex gap-2 items-center">
                 <h2 class="text-sm font-medium">
@@ -313,61 +321,63 @@ useHead({
               </div>
               <DisplayBadge v-if="room.status === 'playing'" text="Live" color="success" rounded="full" />
             </div>
-            <div ref="logRef" class="no-scrollbar h-[420px] overflow-y-auto lg:flex-1 lg:h-auto">
-              <ol v-if="room.events.length" class="py-1">
-                <li
-                  v-for="event in room.events"
-                  :key="event.id"
-                  class="text-sm px-4 py-2 border-b border-mute flex gap-3 items-start last:border-0"
-                >
-                  <DisplayBadge
-                    :text="eventMeta[event.type].label"
-                    :color="eventMeta[event.type].color"
-                    :icon="eventMeta[event.type].icon"
-                    rounded="full"
-                    class="mt-0.5 shrink-0"
-                  />
-                  <div class="flex-1 min-w-0">
-                    <div class="flex gap-2 items-baseline justify-between">
-                      <span class="font-medium truncate">
-                        {{ event.actor ?? eventMeta[event.type].label }}
-                      </span>
-                      <DisplayDate
-                        :date="event.at"
-                        :live="room.status === 'playing'"
-                        class="text-xs shrink-0"
-                      />
+            <div class="lg:flex-1 lg:min-h-0 lg:relative">
+              <div ref="logRef" class="h-[420px] overflow-y-auto lg:inset-0 lg:absolute">
+                <ol v-if="room.events.length" class="py-1">
+                  <li
+                    v-for="event in room.events"
+                    :key="event.id"
+                    class="text-sm px-4 py-2 border-b border-mute flex gap-3 items-start last:border-0"
+                  >
+                    <DisplayBadge
+                      :text="eventMeta[event.type].label"
+                      :color="eventMeta[event.type].color"
+                      :icon="eventMeta[event.type].icon"
+                      rounded="full"
+                      class="mt-0.5 shrink-0"
+                    />
+                    <div class="flex-1 min-w-0">
+                      <div class="flex gap-2 items-baseline justify-between">
+                        <span class="font-medium truncate">
+                          {{ event.actor ?? eventMeta[event.type].label }}
+                        </span>
+                        <DisplayDate
+                          :date="event.at"
+                          :live="room.status === 'playing'"
+                          class="text-xs shrink-0"
+                        />
+                      </div>
+                      <div
+                        v-if="event.type === 'move' && event.payload"
+                        class="text-xs color-muted font-mono mt-0.5"
+                      >
+                        <template v-if="event.payload.type === 'place'">
+                          {{ moveLabel(event.payload) }}
+                          <span class="op-fade">({{ event.payload.x }}, {{ event.payload.y }})</span>
+                        </template>
+                        <template v-else>
+                          {{ event.payload.move }}
+                          · power {{ event.payload.power }}
+                          · score {{ event.payload.score }}
+                        </template>
+                      </div>
+                      <div
+                        v-else-if="event.type === 'game_finished'"
+                        class="text-xs color-muted font-mono mt-0.5"
+                      >
+                        {{ room.winner ?? 'Draw' }}<template v-if="room.game?.finishReason">
+                          · {{ room.game.finishReason }}
+                        </template>
+                      </div>
                     </div>
-                    <div
-                      v-if="event.type === 'move' && event.payload"
-                      class="text-xs color-muted font-mono mt-0.5"
-                    >
-                      <template v-if="event.payload.type === 'place'">
-                        {{ moveLabel(event.payload) }}
-                        <span class="op-fade">({{ event.payload.x }}, {{ event.payload.y }})</span>
-                      </template>
-                      <template v-else>
-                        {{ event.payload.move }}
-                        · power {{ event.payload.power }}
-                        · score {{ event.payload.score }}
-                      </template>
-                    </div>
-                    <div
-                      v-else-if="event.type === 'game_finished'"
-                      class="text-xs color-muted font-mono mt-0.5"
-                    >
-                      {{ room.winner ?? 'Draw' }}<template v-if="room.game?.finishReason">
-                        · {{ room.game.finishReason }}
-                      </template>
-                    </div>
-                  </div>
-                </li>
-              </ol>
-              <FeedbackEmptyState
-                v-else
-                icon="i-carbon-activity"
-                title="No events yet"
-              />
+                  </li>
+                </ol>
+                <FeedbackEmptyState
+                  v-else
+                  icon="i-carbon-activity"
+                  title="No events yet"
+                />
+              </div>
             </div>
           </LayoutCard>
         </aside>

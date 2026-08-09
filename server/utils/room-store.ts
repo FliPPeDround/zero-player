@@ -5,7 +5,6 @@ import type {
   RoomEvent,
   RoomEventType,
   RoomListSocketMessage,
-  RoomMode,
   RoomPlayer,
   RoomSummary,
 } from '#shared/rooms'
@@ -57,6 +56,23 @@ function emitDetail(roomId: string, message: RoomDetailMessage): void {
     listener(message)
 }
 
+/**
+ * Legacy rooms stored players with hardcoded `red`/`blue` slots. Now slots are
+ * game side keys (e.g. `black`/`white` for Gomoku), so remap players by join
+ * order whenever the stored slots no longer match the game definition.
+ */
+function normalizeRoomSides(room: Room): void {
+  const sides = getGame(room.gameId)?.sides ?? []
+  if (!sides.length)
+    return
+  const matches = room.players.every((player, index) => player.slot === sides[index]?.key)
+  if (matches)
+    return
+  room.players.forEach((player, index) => {
+    player.slot = sides[index]?.key ?? `seat-${index + 1}`
+  })
+}
+
 function touch(room: Room): void {
   room.updatedAt = new Date().toISOString()
 }
@@ -80,7 +96,9 @@ function appendEvent(
 }
 
 function addPlayer(room: Room, agent: AgentIdentity): RoomPlayer {
-  const slot = room.players.some(player => player.slot === 'red') ? 'blue' : 'red'
+  const sides = getGame(room.gameId)?.sides ?? []
+  const nextSide = sides.find(side => !room.players.some(player => player.slot === side.key))
+  const slot = nextSide?.key ?? `seat-${room.players.length + 1}`
   const player: RoomPlayer = {
     sessionId: agent.sessionId,
     nickname: agent.nickname,
@@ -144,7 +162,6 @@ export async function createRoom(
     id,
     name: options.name?.trim() || `${agent.nickname}'s room`,
     gameId: game.id,
-    mode: game.mode,
     status: 'waiting',
     hostSessionId: agent.sessionId,
     players: [],
@@ -163,7 +180,6 @@ export async function createRoom(
 export async function listRooms(query: {
   status?: Room['status']
   gameId?: string
-  mode?: RoomMode
   search?: string
   limit?: number
 } = {}): Promise<RoomSummary[]> {
@@ -172,11 +188,11 @@ export async function listRooms(query: {
   const keys = await kv.keys(ROOM_KEY_PREFIX)
   const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
   const rooms = storedRooms.filter((room): room is Room => room !== null)
+  rooms.forEach(normalizeRoomSides)
 
   return rooms
     .filter(room => !query.status || room.status === query.status)
     .filter(room => !query.gameId || room.gameId === query.gameId)
-    .filter(room => !query.mode || room.mode === query.mode)
     .filter(room => !search || (
       room.name.toLowerCase().includes(search)
       || room.id.toLowerCase().includes(search)
@@ -189,7 +205,10 @@ export async function listRooms(query: {
 }
 
 export async function getRoom(roomId: string): Promise<Room | null> {
-  return await kv.get<Room>(roomKey(roomId))
+  const room = await kv.get<Room>(roomKey(roomId))
+  if (room)
+    normalizeRoomSides(room)
+  return room
 }
 
 export async function requireRoom(roomId: string): Promise<Room> {

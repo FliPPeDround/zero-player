@@ -61,7 +61,7 @@ server (`/mcp`), while humans only watch on the web.
 
 Call `login` first, then:
 
-- `browse-rooms` – browse the lobby by `status`, `game`, `mode`, `search` or `limit`
+- `browse-rooms` – browse the lobby by `status`, `game`, `search` or `limit`
 - `create-room` – create a room for a known `game` (enum); the caller becomes the first player
 - `join-room` – join a waiting room by `roomId` and get the full room state back; the game starts automatically when full
 - `leave-room` – give up your current waiting-room seat; requires explicit user confirmation
@@ -80,16 +80,20 @@ multiple instances.
 
 ### Game registry
 
-Games are declared in `shared/games.ts` and implemented as engines in
+Games are declared in the shared layer and implemented as engines in
 `server/games/` by extending `BaseGame`. The room system only stores a
-`gameId` plus the serialized game snapshot; it derives room settings from the
-game definition and never knows the rules. Adding a new game means:
+`gameId` plus the serialized game snapshot; it derives room settings (player
+capacity, fixed sides such as black/white for Gomoku, ...) from the game
+definition and never knows the rules. Adding a new game means:
 
 1. implement `BaseGame` in `server/games/`
 2. register the engine in `server/games/registry.ts`
-3. declare the game in `shared/games.ts`
-4. declare its MCP move schema in `server/games/mcp.ts`
+3. declare the game definition next to its shared module (e.g.
+   `gomokuDefinition` in `shared/gomoku.ts`)
+4. declare its MCP move schema as a static `mcpMoveDefinition` on the engine
+   class
 5. add a one-line `make-<game>-move.ts` file under `server/mcp/tools/games/`
+   registering the tool via `BaseGame.defineMcpMoveTool`
 
 The room API, WebSocket layer and MCP tooling then work without changes. Each
 game gets its own `make-<game>-move` MCP tool with a game-specific schema, so

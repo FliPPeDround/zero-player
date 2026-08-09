@@ -6,13 +6,35 @@ import type {
   GameStatus,
   PlayedAction,
 } from '#shared/game'
-import { getGame } from '#shared/games'
+import type { GameDefinition } from '#shared/games'
+import type { Room } from '#shared/rooms'
+import type { z } from 'zod'
+import { defineMcpTool } from '@nuxtjs/mcp-toolkit/server'
 
 export const GAME_SCHEMA_VERSION = 1
 
 export type MoveOutcome
   = { ok: true, finished: boolean, winner?: string, reason?: string, details?: Record<string, unknown> }
     | { ok: false, error: string }
+
+/**
+ * Contract every game implements to expose its MCP "make a move" tool.
+ * Schema, examples and notation parsing are game knowledge, so they live next
+ * to the engine, and `BaseGame.defineMcpMoveTool` wires them into a
+ * registered tool. Each game exposes it as a static `mcpMoveDefinition` on
+ * its class, which the registry (`server/games/registry.ts`) enforces when
+ * the game is registered.
+ */
+export interface GameMcpMoveDefinition {
+  gameId: string
+  toolName: string
+  title: string
+  description: string
+  inputSchema: Record<string, z.ZodType>
+  inputExamples: Record<string, unknown>[]
+  toAction: (args: Record<string, unknown>) => GameActionRecord
+  describeAction: (args: Record<string, unknown>) => string
+}
 
 /**
  * Base class every platform game implements.
@@ -37,6 +59,13 @@ export abstract class BaseGame<
 > {
   abstract readonly gameId: string
 
+  /**
+   * Platform metadata of this game (sides, capacity, icon, ...). Each game
+   * owns its definition, so the room system and the engine never need a
+   * global registry lookup.
+   */
+  abstract readonly definition: GameDefinition
+
   readonly roomId: string
 
   protected readonly players: GamePlayer[]
@@ -52,6 +81,56 @@ export abstract class BaseGame<
     this.roomId = roomId
     this.players = players.map(player => ({ ...player }))
     this.state = this.createInitialState()
+  }
+
+  /**
+   * Build this game's MCP "make a move" tool from its static
+   * `mcpMoveDefinition`. The one-line tool file under
+   * `server/mcp/tools/games/` registers the result. Games with richer needs
+   * (multiple tools, custom annotations) can override this.
+   */
+  static defineMcpMoveTool(definition: GameMcpMoveDefinition) {
+    return defineMcpTool({
+      name: definition.toolName,
+      group: 'games',
+      description: definition.description,
+      inputSchema: definition.inputSchema,
+      inputExamples: definition.inputExamples,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      handler: async (args) => {
+        const sessionId = getHeader(useEvent(), 'mcp-session-id')
+        if (!sessionId)
+          throw createError({ statusCode: 401, statusMessage: 'Missing MCP session id' })
+
+        const headers = { 'x-session-id': sessionId }
+        const { getCurrentRoomId } = await import('../mcp/utils/current-room')
+        const roomId = await getCurrentRoomId(sessionId)
+        const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
+
+        if (room.gameId !== definition.gameId) {
+          throw createError({
+            statusCode: 409,
+            statusMessage: `You are in a ${room.gameId} room; use make-${room.gameId}-move instead`,
+          })
+        }
+
+        const action = definition.toAction(args as Record<string, unknown>)
+        const updatedRoom = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/moves`, {
+          method: 'POST',
+          headers,
+          body: action,
+        })
+        return {
+          message: `${definition.describeAction(args as Record<string, unknown>)}.`,
+          room: updatedRoom,
+        }
+      },
+    })
   }
 
   get status(): GameStatus {
@@ -71,11 +150,11 @@ export abstract class BaseGame<
   }
 
   get minPlayers(): number {
-    return getGame(this.gameId)?.minPlayers ?? 1
+    return this.definition.minPlayers
   }
 
   get maxPlayers(): number {
-    return getGame(this.gameId)?.maxPlayers ?? 1
+    return this.definition.maxPlayers
   }
 
   get currentPlayerId(): string | null {

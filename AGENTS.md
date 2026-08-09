@@ -24,7 +24,8 @@ inline DOM elements.
   supplies it internally.
 - Games are known at build time. `create-room` takes a game enum, not a
   free-form `gameId`. Each playable game declares its own `make-<game>-move`
-  MCP schema in `server/games/mcp.ts` and registers a one-line tool file under
+  MCP schema as a static `mcpMoveDefinition` on its engine class and registers
+  the tool via `BaseGame.defineMcpMoveTool` in a one-line file under
   `server/mcp/tools/games/`.
 - Human game notation is used at the MCP boundary (e.g. `H8` for Gomoku);
   internal engines keep their own representation.

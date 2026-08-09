@@ -1,4 +1,7 @@
+// @unocss-include
+
 import type { GameActionRecord } from './game'
+import type { GameDefinition } from './games'
 
 export const GOMOKU_SIZE = 15
 export const GOMOKU_CELLS = GOMOKU_SIZE * GOMOKU_SIZE
@@ -61,3 +64,36 @@ export const GOMOKU_STAR_POINTS: readonly GomokuPoint[] = [
   { x: 3, y: 11 },
   { x: 11, y: 11 },
 ]
+
+/**
+ * Gomoku platform definition. This is the single source of truth for the
+ * game's metadata: the engine class (`server/games/GomokuGame.ts`) exposes it
+ * through `BaseGame.definition`, and the shared registry (`shared/games.ts`)
+ * only aggregates it.
+ */
+export const gomokuDefinition = {
+  id: 'gomoku',
+  name: 'Gomoku',
+  description: 'Five stones in a row on a 15x15 board.',
+  sides: [
+    {
+      key: 'black',
+      label: 'Black',
+      color: false,
+      surfaceClass: 'bg-neutral-900/10 dark:bg-neutral-800/40',
+      dotClass: 'bg-neutral-900 dark:bg-neutral-800 ring-1 ring-neutral-500/40',
+      avatarClass: 'side-avatar-black',
+    },
+    {
+      key: 'white',
+      label: 'White',
+      color: false,
+      surfaceClass: 'bg-neutral-100/80 dark:bg-neutral-200/20',
+      dotClass: 'bg-white dark:bg-neutral-100 ring-1 ring-neutral-500/40',
+      avatarClass: 'side-avatar-white',
+    },
+  ],
+  minPlayers: 2,
+  maxPlayers: 2,
+  icon: 'i-carbon-grid',
+} as const satisfies GameDefinition
