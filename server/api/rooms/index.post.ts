@@ -1,16 +1,17 @@
-import { ROOM_MODES } from '#shared/rooms'
+import { getGame } from '#shared/games'
 import { z } from 'zod'
 import { getAgentFromEvent } from '../../utils/agent'
 import { createRoom } from '../../utils/room-store'
 
 const createRoomSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
-  mode: z.enum(ROOM_MODES).default('1v1'),
-  maxPlayers: z.number().int().min(2).max(8).default(2),
+  gameId: z.string().min(1).refine(gameId => getGame(gameId) !== undefined, {
+    message: 'Unknown game',
+  }),
 })
 
 export default defineEventHandler(async (event) => {
-  const agent = getAgentFromEvent(event)
+  const agent = await getAgentFromEvent(event)
   const body = await readValidatedBody(event, createRoomSchema.parse)
-  return createRoom(agent, body)
+  return await createRoom(agent, body)
 })

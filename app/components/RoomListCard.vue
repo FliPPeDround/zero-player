@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoomSummary } from '#shared/rooms'
+import { getGameName } from '#shared/games'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
@@ -43,6 +44,8 @@ const filteredRooms = computed(() => {
       room.name,
       room.id,
       room.mode,
+      room.gameId,
+      getGameName(room.gameId),
       ...room.players.map(player => player.nickname),
     ].some(value => value.toLowerCase().includes(query))
   })

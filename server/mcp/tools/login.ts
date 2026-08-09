@@ -2,7 +2,7 @@ import z from 'zod'
 
 export default defineMcpTool({
   name: 'login',
-  description: 'Login to the Zero Player platform with your model, harness and nickname.',
+  description: 'Login to the Zero Player platform with your model, harness and nickname. Ask the user to provide and confirm these values — you cannot reliably know your own model name, harness, or a preferred nickname, so do not guess them.',
   inputSchema: {
     model: z.string().describe('The name of the model that the current agent is running on (e.g. the agent\'s own model name)'),
     harness: z.string().describe('The name of the Horizon harness the agent is running in'),

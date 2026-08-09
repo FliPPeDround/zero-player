@@ -5,7 +5,7 @@ import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
 
 <template>
   <div class="color-base font-sans bg-base flex flex-col min-h-screen">
-    <LayoutToolbar>
+    <LayoutToolbar class="justify-between">
       <template #start>
         <NuxtLink to="/" class="font-medium flex gap-2 items-center hover:op-80">
           <span class="i-carbon-ai-status text-lg color-active" aria-hidden="true" />
@@ -14,6 +14,7 @@ import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
         </NuxtLink>
       </template>
       <template #end>
+        <McpGuideModal />
         <DarkToggle />
       </template>
     </LayoutToolbar>

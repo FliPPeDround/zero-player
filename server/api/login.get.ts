@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   if (!sessionId)
     throw createError({ statusCode: 400, statusMessage: 'Missing sessionId' })
 
-  const loginState: LoginState | null = getLoginState(sessionId)
+  const loginState: LoginState | null = await getLoginState(sessionId)
 
   if (!loginState)
     throw createError({ statusCode: 404, statusMessage: 'No login found for this session' })

@@ -1,3 +1,4 @@
+import type { GameActionRecord } from '#shared/game'
 import type {
   Room,
   RoomDetailSocketMessage,
@@ -9,7 +10,10 @@ import type {
   RoomSummary,
 } from '#shared/rooms'
 import type { AgentIdentity } from './agent'
-import { ROOM_MODES, toRoomSummary } from '#shared/rooms'
+import { randomUUID } from 'node:crypto'
+import { getGame } from '#shared/games'
+import { toRoomSummary } from '#shared/rooms'
+import { createGameInstance } from '../games/registry'
 
 export type RoomListMessage = RoomListSocketMessage
 export type RoomDetailMessage = RoomDetailSocketMessage
@@ -17,15 +21,18 @@ export type RoomDetailMessage = RoomDetailSocketMessage
 type ListListener = (message: RoomListMessage) => void
 type DetailListener = (message: RoomDetailMessage) => void
 
-const rooms = new Map<string, Room>()
+const ROOM_KEY_PREFIX = 'rooms:'
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
 
 let eventCounter = 0
 
-function randomId(prefix: string, length = 6): string {
-  const suffix = Math.random().toString(36).slice(2, 2 + length)
-  return `${prefix}-${suffix}`
+function roomKey(roomId: string): string {
+  return `${ROOM_KEY_PREFIX}${roomId}`
+}
+
+function randomId(prefix: string): string {
+  return `${prefix}-${randomUUID().replaceAll('-', '').slice(0, 6)}`
 }
 
 function nextEventId(): string {
@@ -69,20 +76,10 @@ function appendEvent(
   }
   room.events.push(event)
   touch(room)
-  emitDetail(room.id, { type: 'event', room, event })
   return event
 }
 
-function notifyUpdate(room: Room): void {
-  emitList('updated', room)
-  emitDetail(room.id, { type: 'update', room })
-}
-
-function addPlayer(
-  room: Room,
-  agent: AgentIdentity,
-  options: { notify?: boolean } = {},
-): RoomPlayer {
+function addPlayer(room: Room, agent: AgentIdentity): RoomPlayer {
   const slot = room.players.some(player => player.slot === 'red') ? 'blue' : 'red'
   const player: RoomPlayer = {
     sessionId: agent.sessionId,
@@ -94,27 +91,21 @@ function addPlayer(
   }
   room.players.push(player)
   appendEvent(room, 'player_joined', agent.nickname)
-  if (options.notify !== false)
-    notifyUpdate(room)
   return player
 }
 
-function startGame(room: Room): void {
-  room.status = 'playing'
-  room.startedAt = new Date().toISOString()
-  appendEvent(room, 'game_started')
-  notifyUpdate(room)
-  void startDemoBattle(room.id)
+async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<void> {
+  await kv.set(roomKey(room.id), room)
+  emitList(type, room)
+  emitDetail(room.id, { type: 'update', room })
 }
 
-async function startDemoBattle(roomId: string): Promise<void> {
-  try {
-    const { runDemoBattle } = await import('./demo-battle')
-    runDemoBattle(roomId)
-  }
-  catch (error) {
-    console.error('[rooms] failed to start demo battle', error)
-  }
+async function startGame(room: Room): Promise<void> {
+  room.status = 'playing'
+  room.startedAt = new Date().toISOString()
+  room.game = createGameInstance(room).snapshot()
+  appendEvent(room, 'game_started')
+  await persistRoom(room, 'updated')
 }
 
 export function onRoomList(listener: ListListener): () => void {
@@ -133,57 +124,63 @@ export function onRoomDetail(roomId: string, listener: DetailListener): () => vo
   }
 }
 
-export function createRoom(
+export async function createRoom(
   agent: AgentIdentity,
-  options: { name?: string, mode?: RoomMode, maxPlayers?: number } = {},
-): Room {
-  const mode = options.mode ?? '1v1'
-  const maxPlayers = options.maxPlayers ?? 2
+  options: { name?: string, gameId: string },
+): Promise<Room> {
+  const game = getGame(options.gameId)
+  if (!game)
+    throw createError({ statusCode: 400, statusMessage: `Unknown game: ${options.gameId}` })
 
-  if (!ROOM_MODES.includes(mode))
-    throw createError({ statusCode: 400, statusMessage: `Unsupported room mode: ${mode}` })
-  if (maxPlayers < 2 || maxPlayers > 8)
-    throw createError({ statusCode: 400, statusMessage: 'maxPlayers must be between 2 and 8' })
+  const activeRoom = await findActiveRoomForSession(agent.sessionId)
+  if (activeRoom)
+    throw createError({ statusCode: 409, statusMessage: `You are already in room ${activeRoom.id}; leave it first` })
 
   let id = randomId('r')
-  while (rooms.has(id))
+  while (await kv.has(roomKey(id)))
     id = randomId('r')
 
   const room: Room = {
     id,
     name: options.name?.trim() || `${agent.nickname}'s room`,
-    mode,
+    gameId: game.id,
+    mode: game.mode,
     status: 'waiting',
     hostSessionId: agent.sessionId,
     players: [],
-    maxPlayers,
+    maxPlayers: game.maxPlayers,
     spectatorCount: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     events: [],
   }
 
-  rooms.set(room.id, room)
-  addPlayer(room, agent, { notify: false })
-  emitList('created', room)
+  addPlayer(room, agent)
+  await persistRoom(room, 'created')
   return room
 }
 
-export function listRooms(query: {
+export async function listRooms(query: {
   status?: Room['status']
+  gameId?: string
   mode?: RoomMode
   search?: string
   limit?: number
-} = {}): RoomSummary[] {
+} = {}): Promise<RoomSummary[]> {
   const search = query.search?.trim().toLowerCase()
   const limit = Math.min(query.limit ?? 100, 200)
+  const keys = await kv.keys(ROOM_KEY_PREFIX)
+  const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
+  const rooms = storedRooms.filter((room): room is Room => room !== null)
 
-  return [...rooms.values()]
+  return rooms
     .filter(room => !query.status || room.status === query.status)
+    .filter(room => !query.gameId || room.gameId === query.gameId)
     .filter(room => !query.mode || room.mode === query.mode)
     .filter(room => !search || (
       room.name.toLowerCase().includes(search)
       || room.id.toLowerCase().includes(search)
+      || room.gameId.toLowerCase().includes(search)
       || room.players.some(player => player.nickname.toLowerCase().includes(search))
     ))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -191,19 +188,40 @@ export function listRooms(query: {
     .map(toRoomSummary)
 }
 
-export function getRoom(roomId: string): Room | null {
-  return rooms.get(roomId) ?? null
+export async function getRoom(roomId: string): Promise<Room | null> {
+  return await kv.get<Room>(roomKey(roomId))
 }
 
-export function requireRoom(roomId: string): Room {
-  const room = getRoom(roomId)
+export async function requireRoom(roomId: string): Promise<Room> {
+  const room = await getRoom(roomId)
   if (!room)
     throw createError({ statusCode: 404, statusMessage: 'Room not found' })
   return room
 }
 
-export function joinRoom(roomId: string, agent: AgentIdentity): Room {
-  const room = requireRoom(roomId)
+export async function findActiveRoomForSession(sessionId: string): Promise<Room | null> {
+  const keys = await kv.keys(ROOM_KEY_PREFIX)
+  const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
+  return storedRooms.find((room): room is Room => (
+    room !== null
+    && room.status !== 'finished'
+    && room.players.some(player => player.sessionId === sessionId)
+  )) ?? null
+}
+
+export async function requireActiveRoomForSession(sessionId: string): Promise<Room> {
+  const room = await findActiveRoomForSession(sessionId)
+  if (!room)
+    throw createError({ statusCode: 404, statusMessage: 'You are not in any active room' })
+  return room
+}
+
+export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Room> {
+  const room = await requireRoom(roomId)
+  const activeRoom = await findActiveRoomForSession(agent.sessionId)
+
+  if (activeRoom && activeRoom.id !== roomId)
+    throw createError({ statusCode: 409, statusMessage: `You are already in room ${activeRoom.id}; leave it first` })
 
   if (room.status !== 'waiting')
     throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}; it is no longer accepting players` })
@@ -215,13 +233,15 @@ export function joinRoom(roomId: string, agent: AgentIdentity): Room {
   addPlayer(room, agent)
 
   if (room.players.length === room.maxPlayers)
-    startGame(room)
+    await startGame(room)
+  else
+    await persistRoom(room, 'updated')
 
   return room
 }
 
-export function leaveRoom(roomId: string, agent: AgentIdentity): Room {
-  const room = requireRoom(roomId)
+export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<Room> {
+  const room = await requireRoom(roomId)
   const index = room.players.findIndex(player => player.sessionId === agent.sessionId)
 
   if (index === -1)
@@ -236,39 +256,79 @@ export function leaveRoom(roomId: string, agent: AgentIdentity): Room {
     room.hostSessionId = room.players[0].sessionId
 
   if (room.players.length === 0) {
-    rooms.delete(room.id)
+    await kv.del(roomKey(room.id))
     emitList('deleted', room)
     emitDetail(room.id, { type: 'update', room })
     return room
   }
 
-  notifyUpdate(room)
+  await persistRoom(room, 'updated')
   return room
 }
 
-export function setSpectatorCount(roomId: string, count: number): void {
-  const room = getRoom(roomId)
+export async function setSpectatorCount(roomId: string, count: number): Promise<void> {
+  const room = await getRoom(roomId)
   if (!room)
     return
-  room.spectatorCount = Math.max(0, count)
-  notifyUpdate(room)
+  const normalized = Math.max(0, count)
+  if (room.spectatorCount === normalized)
+    return
+  room.spectatorCount = normalized
+  await persistRoom(room, 'updated')
 }
 
-export function emitGameMove(roomId: string, actor: string, payload: Record<string, unknown>): void {
-  const room = getRoom(roomId)
+export async function emitGameMove(roomId: string, actor: string, payload: Record<string, unknown>): Promise<void> {
+  const room = await getRoom(roomId)
   if (!room || room.status !== 'playing')
     return
   appendEvent(room, 'move', actor, payload)
-  notifyUpdate(room)
+  await persistRoom(room, 'updated')
 }
 
-export function finishGame(roomId: string, winner?: string): void {
-  const room = getRoom(roomId)
+/**
+ * Authoritative entry point for gameplay. Any player (agent via MCP/API,
+ * future human input) submits an action through here; the game engine
+ * validates it, the new snapshot is persisted and broadcast, and the room is
+ * finished when the engine reports a terminal state.
+ */
+export async function submitGameMove(
+  roomId: string,
+  playerId: string,
+  action: GameActionRecord,
+): Promise<Room> {
+  const room = await requireRoom(roomId)
+
+  if (room.status !== 'playing')
+    throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}` })
+
+  const game = createGameInstance(room)
+  const outcome = game.play(playerId, action)
+  if (!outcome.ok)
+    throw createError({ statusCode: 409, statusMessage: outcome.error })
+
+  room.game = game.snapshot()
+  const actor = room.players.find(player => player.sessionId === playerId)?.nickname
+  appendEvent(room, 'move', actor, { ...action })
+  await persistRoom(room, 'updated')
+
+  if (game.status === 'finished') {
+    const winnerNickname = room.players.find(player => player.sessionId === game.winner)?.nickname
+    await finishGame(roomId, winnerNickname ?? game.winner)
+  }
+
+  return await getRoom(roomId) ?? room
+}
+
+export async function finishGame(roomId: string, winner?: string): Promise<void> {
+  const room = await getRoom(roomId)
   if (!room || room.status !== 'playing')
     return
   room.status = 'finished'
   room.finishedAt = new Date().toISOString()
   room.winner = winner
-  appendEvent(room, 'game_finished', undefined, { winner })
-  notifyUpdate(room)
+  appendEvent(room, 'game_finished', undefined, {
+    winner,
+    reason: room.game?.finishReason,
+  })
+  await persistRoom(room, 'updated')
 }

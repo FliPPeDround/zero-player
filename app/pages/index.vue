@@ -35,7 +35,7 @@ const stats = computed(() => [
 
 <template>
   <div class="flex flex-col gap-6">
-    <LobbyHero :connected="connected" :visitors="visitors" :stats="stats" />
+    <LobbyHero :visitors="visitors" :stats="stats" />
     <RoomListCard :rooms="rooms" :loaded="loaded" :connected="connected" />
   </div>
 </template>

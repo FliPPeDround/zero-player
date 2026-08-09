@@ -5,7 +5,6 @@ import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
 
 defineProps<{
-  connected: boolean
   visitors: number
   stats: Array<{ label: string, value: number, icon: string }>
 }>()
@@ -26,18 +25,12 @@ defineProps<{
             color="primary"
             rounded="full"
           />
-          <DisplayBadge
-            :text="connected ? 'Live' : 'Connecting'"
-            :color="connected ? 'success' : 'warning'"
-            rounded="full"
-          />
         </div>
         <div class="flex flex-wrap gap-3 items-center">
           <div class="text-xs color-muted flex gap-1.5 items-center">
             <span class="i-carbon-video" aria-hidden="true" />
             <DisplayNumber :value="visitors" suffix=" viewers online" />
           </div>
-          <McpGuideModal />
         </div>
       </div>
       <h1 class="text-3xl tracking-tight font-semibold mt-6 sm:text-4xl">

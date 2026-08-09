@@ -1,3 +1,5 @@
+import type { GameSnapshot } from './game'
+
 export const ROOM_MODES = ['1v1', 'free-for-all'] as const
 
 export type RoomMode = typeof ROOM_MODES[number]
@@ -30,6 +32,7 @@ export interface RoomEvent {
 export interface Room {
   id: string
   name: string
+  gameId: string
   mode: RoomMode
   status: RoomStatus
   hostSessionId: string
@@ -42,11 +45,14 @@ export interface Room {
   finishedAt?: string
   winner?: string
   events: RoomEvent[]
+  /** Serialized game instance attached to this room while it exists. */
+  game?: GameSnapshot
 }
 
 export interface RoomSummary {
   id: string
   name: string
+  gameId: string
   mode: RoomMode
   status: RoomStatus
   playerCount: number
@@ -61,6 +67,7 @@ export interface RoomSummary {
 
 export interface RoomListQuery {
   status?: RoomStatus
+  gameId?: string
   mode?: RoomMode
   search?: string
   limit?: number
@@ -80,6 +87,7 @@ export function toRoomSummary(room: Room): RoomSummary {
   return {
     id: room.id,
     name: room.name,
+    gameId: room.gameId,
     mode: room.mode,
     status: room.status,
     playerCount: room.players.length,

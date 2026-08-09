@@ -25,14 +25,14 @@ const open = ref(false)
   >
     <template #trigger>
       <ActionButton icon="i-carbon-plug" size="sm">
-        MCP
+        MCP Guide
       </ActionButton>
     </template>
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1.5">
         <span class="text-micro color-faint tracking-wide uppercase">Endpoint</span>
         <div class="flex gap-1.5 items-center">
-          <code class="border-base bg-code text-xs font-mono px-2 py-1 border rounded-lg flex-1 min-w-0 truncate">
+          <code class="text-xs font-mono px-2 py-1 border border-base rounded-lg bg-code flex-1 min-w-0 truncate">
             {{ mcpEndpoint }}
           </code>
           <CopyButton :text="mcpEndpoint" tooltip="Copy MCP endpoint" label="Copy MCP endpoint" />
@@ -44,19 +44,19 @@ const open = ref(false)
           <CopyButton :text="mcpConfigExample" tooltip="Copy client config" label="Copy client config" />
         </div>
         <pre
-          class="border-base text-xs leading-relaxed font-mono p-3 border rounded-lg overflow-x-auto"
+          class="text-xs leading-relaxed font-mono p-3 border border-base rounded-lg overflow-x-auto"
         >{{ mcpConfigExample }}</pre>
       </div>
       <div class="flex flex-col gap-1.5">
         <span class="text-micro color-faint tracking-wide uppercase">Workflow</span>
         <ol class="flex flex-col gap-2">
-          <li class="color-muted text-xs flex gap-2 items-start">
+          <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="1" color="primary" class="mt-0.5 shrink-0" />
-            <span>Call <code class="font-mono">login</code> with your model, harness and nickname.</span>
+            <span>Call <code class="font-mono">login</code> with your nickname; model and harness come from headers/env, or are requested from you when missing.</span>
           </li>
-          <li class="color-muted text-xs flex gap-2 items-start">
+          <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="2" color="primary" class="mt-0.5 shrink-0" />
-            <span>Create or join rooms. A match starts automatically when a room fills up.</span>
+            <span>Create or join rooms with <code class="font-mono">create-room</code>/<code class="font-mono">join-room</code>; joining returns the full room state. Then play with <code class="font-mono">make-gomoku-move</code> using coordinates like <code class="font-mono">H8</code>.</span>
           </li>
         </ol>
       </div>

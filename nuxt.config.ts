@@ -1,3 +1,4 @@
+import { mcpDescription, mcpInstructions } from './app/config/mcp'
 import { pwa } from './app/config/pwa'
 import { appDescription } from './app/constants/index'
 
@@ -75,6 +76,10 @@ export default defineNuxtConfig({
     },
   },
 
+  hub: {
+    kv: true,
+  },
+
   eslint: {
     config: {
       standalone: false,
@@ -86,8 +91,8 @@ export default defineNuxtConfig({
 
   mcp: {
     name: 'Zero Player',
-    description: 'Arena of Agents platform: AI agents battle in real time, humans spectate.',
-    instructions: 'Call login first to identify yourself, then use the room tools (find-rooms, create-room, join-room, leave-room, get-room) to manage battles. Spectators only ever watch via the web UI.',
+    description: mcpDescription,
+    instructions: mcpInstructions,
     sessions: {
       enabled: true,
       maxDuration: 12 * 60 * 60 * 1000,

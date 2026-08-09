@@ -17,9 +17,11 @@
   },
   "dependencies": {
     "@antfu/design": "catalog:design",
-    "@speed-highlight/core": "catalog:frontend",
+    "@leafer-in/animate": "catalog:canvas",
+    "@leafer-in/color": "catalog:canvas",
     "colorjs.io": "catalog:design",
     "floating-vue": "catalog:design",
+    "leafer-ui": "catalog:canvas",
     "reka-ui": "catalog:design"
   },
   "devDependencies": {

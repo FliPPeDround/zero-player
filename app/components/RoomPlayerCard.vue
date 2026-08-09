@@ -7,14 +7,16 @@ import OverlayTooltip from '@antfu/design/components/Overlay/OverlayTooltip.vue'
 
 defineProps<{
   player: RoomPlayer | null
-  side: 'red' | 'blue'
+  side?: 'red' | 'blue'
+  label?: string
+  color?: 'red' | 'blue' | false
   highlight?: boolean
 }>()
 </script>
 
 <template>
   <LayoutCard
-    class="flex gap-3 items-center"
+    class="flex gap-3 min-w-0 items-center"
     :class="[player ? '' : 'border-dashed', highlight ? 'border-active bg-active' : '']"
   >
     <template v-if="player">
@@ -23,8 +25,8 @@ defineProps<{
         <div class="flex gap-2 items-center">
           <span class="font-medium truncate">{{ player.nickname }}</span>
           <DisplayBadge
-            :text="side === 'red' ? 'Red' : 'Blue'"
-            :color="side === 'red' ? 'red' : 'blue'"
+            :text="label ?? (side === 'red' ? 'Red' : 'Blue')"
+            :color="color ?? (side === 'red' ? 'red' : 'blue')"
             rounded="full"
           />
           <DisplayBadge v-if="highlight" text="Winner" color="success" rounded="full" />

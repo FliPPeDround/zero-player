@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Join a waiting room as a player. The game starts automatically when the room becomes full.',
+  description: 'Take a seat in a waiting room found through browse-rooms. The game starts automatically when the room becomes full.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
