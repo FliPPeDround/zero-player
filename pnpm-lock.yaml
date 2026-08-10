@@ -44,6 +44,16 @@ catalogs:
     leafer-ui:
       specifier: ^2.2.9
       version: 2.2.9
+  default:
+    '@libsql/client':
+      specifier: ^0.17.4
+      version: 0.17.4
+    drizzle-kit:
+      specifier: ^0.31.10
+      version: 0.31.10
+    drizzle-orm:
+      specifier: ^0.45.2
+      version: 0.45.2
   design:
     '@antfu/design':
       specifier: ^0.3.3
@@ -135,13 +145,13 @@ importers:
         specifier: catalog:canvas
         version: 2.2.9(@leafer-in/interface@2.2.9(@leafer-ui/interface@2.2.9)(@leafer/interface@2.2.9))(@leafer-ui/draw@2.2.9)(@leafer-ui/interface@2.2.9)
       '@libsql/client':
-        specifier: ^0.17.4
+        specifier: 'catalog:'
         version: 0.17.4
       colorjs.io:
         specifier: catalog:design
         version: 0.6.1
       drizzle-orm:
-        specifier: ^0.45.2
+        specifier: 'catalog:'
         version: 0.45.2(@cloudflare/workers-types@4.20260702.1)(@libsql/client@0.17.4)
       floating-vue:
         specifier: catalog:design
@@ -202,7 +212,7 @@ importers:
         specifier: catalog:build
         version: 14.4.0(49d81fd3932a96daa5f18868c529c0e5)
       drizzle-kit:
-        specifier: ^0.31.10
+        specifier: 'catalog:'
         version: 0.31.10
       eslint:
         specifier: catalog:dev

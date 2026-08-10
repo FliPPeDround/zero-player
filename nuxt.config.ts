@@ -12,7 +12,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxthub/core',
     '@nuxtjs/mcp-toolkit',
-    'floating-vue/nuxt'
+    'floating-vue/nuxt',
   ],
 
   devtools: {
@@ -58,7 +58,7 @@ export default defineNuxtConfig({
     typedPages: true,
   },
 
-  compatibilityDate: '2024-08-14',
+  compatibilityDate: '2024-09-19',
 
   nitro: {
     scheduledTasks: {
