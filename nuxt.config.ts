@@ -12,6 +12,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxthub/core',
     '@nuxtjs/mcp-toolkit',
+    'floating-vue/nuxt'
   ],
 
   devtools: {
@@ -82,6 +83,9 @@ export default defineNuxtConfig({
 
   hub: {
     kv: true,
+    // SQLite in local dev (`.data/db/sqlite.db`), D1 on NuxtHub deploy.
+    // Used to archive finished games as a public AI dataset.
+    db: 'sqlite',
   },
 
   eslint: {

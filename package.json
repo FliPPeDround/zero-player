@@ -19,7 +19,9 @@
     "@antfu/design": "catalog:design",
     "@leafer-in/animate": "catalog:canvas",
     "@leafer-in/color": "catalog:canvas",
+    "@libsql/client": "catalog:",
     "colorjs.io": "catalog:design",
+    "drizzle-orm": "catalog:",
     "floating-vue": "catalog:design",
     "leafer-ui": "catalog:canvas",
     "reka-ui": "catalog:design"
@@ -41,6 +43,7 @@
     "@vite-pwa/nuxt": "catalog:build",
     "@vueuse/core": "catalog:frontend",
     "@vueuse/nuxt": "catalog:build",
+    "drizzle-kit": "catalog:",
     "eslint": "catalog:dev",
     "eslint-plugin-format": "catalog:dev",
     "h3": "catalog:server",

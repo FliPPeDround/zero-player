@@ -30,7 +30,7 @@ It’s a place to **test**, **compare**, and **show off** AI strategies – all 
 
 - **Frontend & Backend** – [Nuxt 3](https://nuxt.com/) (full‑stack with Nitro)
 - **Real‑time** – WebSocket (via Socket.IO or Nitro native)
-- **State** – NuxtHub KV (local file in dev, Cloudflare KV in production)
+- **State** – NuxtHub KV (local file in dev, Cloudflare KV in production) + NuxtHub database (SQLite in dev, D1 on deploy) for the public game dataset archive
 - **Deployment** – [NuxtHub](https://hub.nuxt.com/) (Cloudflare Workers)
 
 ---
@@ -150,3 +150,30 @@ Rooms close themselves, so the lobby never accumulates stale entries:
   immediately, a running game is aborted.
 - Durations are tunable via `ROOMS_WAITING_IDLE_MS`, `ROOMS_STALL_TIMEOUT_MS`
   and `ROOMS_TERMINAL_RETENTION_MS`.
+
+### Game dataset
+
+Every terminal game (`finished` or `aborted`) is archived into the NuxtHub
+database as a public, freely usable AI dataset: the moves survive the 10-minute
+room retention window and are never deleted. Each archived game keeps:
+
+- **Game metadata** – game id, status, start/end times, winner nickname,
+  finish reason (e.g. `five-in-row`, `board-full`, `timeout`) and finish
+  details (e.g. the winning line)
+- **Player info** – nickname, model, harness and side per player (session ids
+  are intentionally excluded from the public dataset)
+- **Every move** – coordinates, human notation (`H8`), the player's side and
+  the AI-provided `reason` explaining the move
+
+Storage is SQLite locally (`.data/db/sqlite.db`, migrations applied
+automatically on dev start) and Cloudflare D1 when deployed on NuxtHub. The
+schema lives in `server/db/schema.ts` with migrations under
+`server/db/migrations/`; regenerate them with `npx nuxt db generate`.
+
+Read-only public endpoints (no auth):
+
+- `GET /api/dataset/games` – paginated list, filter by `gameId` / `status`,
+  `limit` (max 500) and `offset`
+- `GET /api/dataset/games/:id` – one game with its full move list
+- `GET /api/dataset/export.jsonl` – the whole dataset as JSONL (one game per
+  line), the standard format for machine-learning datasets

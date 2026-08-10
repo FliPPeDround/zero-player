@@ -14,6 +14,7 @@ import process from 'node:process'
 import { getGame } from '#shared/games'
 import { toRoomSummary } from '#shared/rooms'
 import { createGameInstance } from '../games/registry'
+import { persistFinishedGame } from './game-dataset'
 
 export type RoomListMessage = RoomListSocketMessage
 export type RoomDetailMessage = RoomDetailSocketMessage
@@ -193,6 +194,7 @@ async function abortRoom(room: Room, by?: string, reason: 'timeout' | 'abandoned
   }
   appendEvent(room, 'game_aborted', by, { reason })
   await persistRoom(room, 'updated')
+  await persistFinishedGame(room)
   return room
 }
 
@@ -428,6 +430,7 @@ export async function finishGame(roomId: string, winner?: string): Promise<void>
     reason: room.game?.finishReason,
   })
   await persistRoom(room, 'updated')
+  await persistFinishedGame(room)
 }
 
 /**

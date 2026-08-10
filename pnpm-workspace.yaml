@@ -5,6 +5,10 @@ autoInstallPeers: false
 trustPolicy: no-downgrade
 
 packages: []
+catalog:
+  '@libsql/client': ^0.17.4
+  drizzle-kit: ^0.31.10
+  drizzle-orm: ^0.45.2
 catalogs:
   agents:
     '@nuxtjs/mcp-toolkit': ^0.18.1
