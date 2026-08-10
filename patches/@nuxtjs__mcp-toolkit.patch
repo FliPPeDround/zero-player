@@ -1,0 +1,72 @@
+diff --git a/dist/runtime/server/mcp/providers/cloudflare.js b/dist/runtime/server/mcp/providers/cloudflare.js
+index 83bc00a8fd6f84223c861bb19146425f8e57c79f..3c0a29157feb56278a7666685fc30024eae20057 100644
+--- a/dist/runtime/server/mcp/providers/cloudflare.js
++++ b/dist/runtime/server/mcp/providers/cloudflare.js
+@@ -1,14 +1,8 @@
++import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+ import { createMcpTransportHandler } from "./types.js";
+-import { getHeader, toWebRequest } from "../compat.js";
++import { toWebRequest } from "../compat.js";
+ import { validateOrigin } from "./security.js";
+-import { isSessionInvalidated, isSessionInvalidationRequested, markSessionInvalidated } from "../session-state.js";
+ import config from "#nuxt-mcp-toolkit/config.mjs";
+-const fallbackCtx = {
+-  waitUntil: () => {
+-  },
+-  passThroughOnException: () => {
+-  }
+-};
+ function createJsonRpcErrorResponse(status, code, message) {
+   return new Response(JSON.stringify({
+     jsonrpc: "2.0",
+@@ -23,20 +17,39 @@ export default createMcpTransportHandler(async (createServer, event) => {
+   const securityConfig = config.security ?? {};
+   const originError = validateOrigin(event, securityConfig);
+   if (originError) return originError;
+-  const sessionId = getHeader(event, "mcp-session-id");
+-  if (sessionId && await isSessionInvalidated(sessionId)) {
+-    return createJsonRpcErrorResponse(404, -32001, "Session not found");
++  const request = toWebRequest(event);
++  if (request.method === "OPTIONS") {
++    return new Response(null, {
++      status: 204,
++      headers: {
++        "Access-Control-Allow-Origin": "*",
++        "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, mcp-session-id, MCP-Protocol-Version, Mcp-Method, Mcp-Name",
++        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
++        "Access-Control-Max-Age": "86400"
++      }
++    });
+   }
+-  if (sessionId && isSessionInvalidationRequested(event)) {
+-    await markSessionInvalidated(sessionId);
++  if (request.method !== "POST") {
++    return createJsonRpcErrorResponse(405, -32000, "Method not allowed. Use POST for MCP requests.");
+   }
++  // Cloudflare Workers run each request in a fresh isolate, so session state
++  // cannot live in memory between requests: a sessionful transport returns
++  // "Session not found" on the very next request. Serve MCP statelessly
++  // (JSON responses, no Mcp-Session-Id) instead. This project resolves user
++  // identity through the login auth ID passed in tool calls, so no session
++  // state is needed.
+   const server = createServer();
+   event.context._mcpServer = server;
+-  const { createMcpHandler } = await import("agents/mcp");
+-  const handler = createMcpHandler(server, {
+-    route: ""
++  const transport = new WebStandardStreamableHTTPServerTransport({
++    sessionIdGenerator: void 0,
++    enableJsonResponse: true
+   });
+-  const request = toWebRequest(event);
+-  const cf = event.context.cloudflare;
+-  return handler(request, cf?.env ?? {}, cf?.ctx ?? fallbackCtx);
++  await server.connect(transport);
++  try {
++    return await transport.handleRequest(request);
++  }
++  finally {
++    await transport.close();
++    await server.close();
++  }
+ });

@@ -3,6 +3,7 @@ node_modules
 *.log
 dist
 .output
+.wrangler
 .nuxt
 .env
 .idea/

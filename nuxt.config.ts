@@ -137,7 +137,11 @@ export default defineNuxtConfig({
     description: mcpDescription,
     instructions: mcpInstructions,
     sessions: {
-      enabled: true,
+      // Cloudflare Workers cannot keep MCP sessions in memory between
+      // requests, so the Cloudflare build serves MCP statelessly (the
+      // toolkit's Cloudflare provider is patched to do so). Local/Node
+      // deployments keep in-memory sessions.
+      enabled: !isCloudflareBuild,
       maxDuration: 12 * 60 * 60 * 1000,
     },
   },
