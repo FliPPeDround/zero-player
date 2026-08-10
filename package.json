@@ -3,7 +3,6 @@
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "build": "nuxt build",
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
@@ -13,7 +12,12 @@
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "build": "bash -lc 'if [[ -z \"${WORKERS_CI_BRANCH:-}\" || \"$WORKERS_CI_BRANCH\" == \"main\" ]]; then pnpm run build:production; else pnpm run build:preview; fi'",
+    "build:production": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build",
+    "build:preview": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build --envName preview",
+    "deploy:cloudflare": "sh -c 'pnpm exec wrangler --cwd .output/server d1 migrations apply DB --remote && pnpm exec wrangler --cwd .output deploy --keep-vars'",
+    "deploy:cloudflare:preview": "sh -c 'pnpm exec wrangler --cwd .output/server d1 migrations apply DB --remote && pnpm exec wrangler --cwd .output versions upload'"
   },
   "dependencies": {
     "@antfu/design": "catalog:design",
