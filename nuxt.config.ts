@@ -1,6 +1,20 @@
+import process from 'node:process'
+
 import { mcpDescription, mcpInstructions } from './app/config/mcp'
 import { pwa } from './app/config/pwa'
 import { appDescription } from './app/constants/index'
+
+const isCloudflareBuild = process.env.WORKERS_CI_BRANCH !== undefined
+  || process.env.NITRO_PRESET?.includes('cloudflare')
+const cloudflareDatabaseId = process.env.NUXT_HUB_CLOUDFLARE_DATABASE_ID || process.env.CLOUDFLARE_DATABASE_ID || 'e657e3d5-08c4-44c0-88e4-5ebe3b81b84d'
+const cloudflareKvNamespaceId = process.env.NUXT_HUB_CLOUDFLARE_KV_ID || process.env.CLOUDFLARE_KV_ID || 'cae1f88741154b8bacc6ef00f674b716'
+
+if (isCloudflareBuild && !cloudflareDatabaseId) {
+  console.warn('[nuxt:hub] Missing NUXT_HUB_CLOUDFLARE_DATABASE_ID (or CLOUDFLARE_DATABASE_ID) build-time variable: the D1 `DB` binding will not be generated.')
+}
+if (isCloudflareBuild && !cloudflareKvNamespaceId) {
+  console.warn('[nuxt:hub] Missing NUXT_HUB_CLOUDFLARE_KV_ID (or CLOUDFLARE_KV_ID) build-time variable: the KV `KV` binding will not be generated.')
+}
 
 export default defineNuxtConfig({
   modules: [
@@ -82,10 +96,31 @@ export default defineNuxtConfig({
   },
 
   hub: {
-    kv: true,
-    // SQLite in local dev (`.data/db/sqlite.db`), D1 on NuxtHub deploy.
+    // Cloudflare Workers builds need explicit resource IDs, otherwise
+    // NuxtHub cannot generate the `KV` / `DB` bindings in
+    // `.output/server/wrangler.json`. Set these in the build environment:
+    //   - NUXT_HUB_CLOUDFLARE_KV_ID (KV namespace ID)
+    //   - NUXT_HUB_CLOUDFLARE_DATABASE_ID (D1 database ID)
+    // `CLOUDFLARE_KV_ID` / `CLOUDFLARE_DATABASE_ID` are accepted as aliases.
+    kv: isCloudflareBuild
+      ? {
+          driver: 'cloudflare-kv-binding',
+          binding: 'KV',
+          namespaceId: cloudflareKvNamespaceId || '',
+        }
+      : true,
+    // SQLite in local dev (`.data/db/sqlite.db`), D1 on Cloudflare deploy.
     // Used to archive finished games as a public AI dataset.
-    db: 'sqlite',
+    db: isCloudflareBuild
+      ? {
+          dialect: 'sqlite',
+          driver: 'd1',
+          connection: {
+            databaseId: cloudflareDatabaseId || '',
+          },
+          applyMigrationsDuringBuild: false,
+        }
+      : 'sqlite',
   },
 
   eslint: {
