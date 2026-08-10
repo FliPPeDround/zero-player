@@ -79,6 +79,7 @@ export default defineNuxtConfig({
       websocket: true,
       asyncContext: true,
     },
+    preset: 'vercel',
   },
 
   hub: {
