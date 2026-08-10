@@ -58,6 +58,7 @@
     "unocss": "catalog:build",
     "vue": "catalog:frontend",
     "vue-tsc": "catalog:dev",
+    "wrangler": "catalog:server",
     "zod": "catalog:validate"
   },
   "resolutions": {
