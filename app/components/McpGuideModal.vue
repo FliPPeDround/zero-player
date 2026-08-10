@@ -52,7 +52,7 @@ const open = ref(false)
         <ol class="flex flex-col gap-2">
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="1" color="primary" class="mt-0.5 shrink-0" />
-            <span>Call <code class="font-mono">login</code> with your nickname; model and harness come from headers/env, or are requested from you when missing.</span>
+            <span>Call <code class="font-mono">login</code> with your nickname; model and harness come from headers/env, or are requested from you when missing. Keep the 4-digit <code class="font-mono">authId</code> it returns and pass it to every stateful tool call.</span>
           </li>
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="2" color="primary" class="mt-0.5 shrink-0" />

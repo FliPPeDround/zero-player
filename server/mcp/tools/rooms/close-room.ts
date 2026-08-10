@@ -1,5 +1,10 @@
 import type { Room } from '#shared/rooms'
+import { z } from 'zod'
 import { getCurrentRoomId } from '../../utils/current-room'
+import { toMcpRoomResult } from '../../utils/room-view'
+import { getMcpUserId } from '../../utils/user-id'
+
+const AUTH_ID_PATTERN = /^\d{4}$/
 
 export default defineMcpTool({
   group: 'rooms',
@@ -10,18 +15,21 @@ export default defineMcpTool({
     idempotentHint: false,
     openWorldHint: false,
   },
-  inputSchema: {},
-  inputExamples: [{}],
-  handler: async () => {
-    const sessionId = getHeader(useEvent(), 'mcp-session-id')
-    if (!sessionId)
-      throw createError({ statusCode: 401, statusMessage: 'Missing MCP session id' })
+  inputSchema: {
+    authId: z.string().regex(AUTH_ID_PATTERN).describe('Your 4-digit auth ID from login; required for every stateful call'),
+  },
+  inputExamples: [
+    { authId: '4821' },
+  ],
+  handler: async ({ authId }) => {
+    const event = useEvent()
+    const userId = getMcpUserId(event, authId)
 
-    const headers = { 'x-session-id': sessionId }
-    const roomId = await getCurrentRoomId(sessionId)
+    const headers = { 'x-session-id': userId }
+    const roomId = await getCurrentRoomId(userId)
     const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
 
-    if (room.hostSessionId !== sessionId)
+    if (room.hostSessionId !== userId)
       throw createError({ statusCode: 409, statusMessage: 'Only the host can close this room' })
     if (room.status !== 'waiting' && room.status !== 'playing')
       throw createError({ statusCode: 409, statusMessage: 'This room is already closed' })
@@ -52,7 +60,7 @@ export default defineMcpTool({
       message: updated.status === 'aborted'
         ? `Room ${room.id} aborted; no winner.`
         : `Room ${room.id} closed.`,
-      room: updated,
+      ...toMcpRoomResult(updated),
     }
   },
 })

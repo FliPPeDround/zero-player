@@ -21,7 +21,7 @@ const DIRECTIONS = [
   { dx: 1, dy: -1 },
 ] as const
 
-const GOMOKU_POINT_PATTERN = /^[a-o]([1-9]|1[0-5])$/i
+const GOMOKU_POINT_PATTERN = /^[A-O]([1-9]|1[0-5])$/
 
 /**
  * Gomoku on a standard 15x15 board. Black (first seat) starts, players
@@ -37,11 +37,11 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
     gameId: gomokuDefinition.id,
     toolName: 'make-gomoku-move',
     title: 'Make Gomoku move',
-    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are A-O, rows are 1-15. Only call this when it is your turn and the room snapshot shows an empty cell. Always explain why you chose this move with the reason argument.',
+    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are uppercase letters A-O, rows are 1-15. Always explain why you chose this move with the reason argument; it is shown to spectators in the battle log.',
     inputSchema: {
       move: z.string()
-        .regex(GOMOKU_POINT_PATTERN, 'Use standard notation like H8, e.g. A1, H8 or O15')
-        .describe('Standard Gomoku coordinate, e.g. H8'),
+        .regex(GOMOKU_POINT_PATTERN, 'Use uppercase standard notation like H8, e.g. A1, H8 or O15')
+        .describe('Uppercase standard Gomoku coordinate, e.g. H8'),
       reason: z.string()
         .trim()
         .min(1, 'Explain why you chose this move')

@@ -43,20 +43,39 @@ export function gomokuMoveLabel(action: { x: number, y: number }): string {
   return `${gomokuColumnLabel(action.x)}${action.y + 1}`
 }
 
-const GOMOKU_MOVE_PATTERN = /^([a-o])([1-9]|1[0-5])$/i
+const GOMOKU_MOVE_PATTERN = /^([A-O])([1-9]|1[0-5])$/
 
 /**
  * Parse standard Gomoku notation such as `H8` into board coordinates.
- * Columns are A-O (x), rows are 1-15 (y).
+ * Columns are uppercase A-O (x), rows are 1-15 (y); lowercase letters are
+ * rejected.
  */
 export function parseGomokuMove(move: string): GomokuPoint | null {
   const match = GOMOKU_MOVE_PATTERN.exec(move.trim())
   if (!match)
     return null
   return {
-    x: match[1]!.toUpperCase().charCodeAt(0) - 65,
+    x: match[1]!.charCodeAt(0) - 65,
     y: Number(match[2]!) - 1,
   }
+}
+
+/**
+ * Render the board as plain ASCII art for text-only clients: black `X`,
+ * white `O`, empty `.`. Columns are A-O and rows run 15-1 from top to bottom,
+ * matching the standard notation used by `make-gomoku-move` (e.g. H8).
+ */
+export function renderGomokuBoard(state: GomokuState): string {
+  const header = `  ${Array.from({ length: GOMOKU_SIZE }, (_, x) => gomokuColumnLabel(x)).join(' ')}`
+  const lines = [header]
+  for (let y = GOMOKU_SIZE - 1; y >= 0; y--) {
+    const cells = Array.from({ length: GOMOKU_SIZE }, (_, x) => {
+      const cell = state.board[gomokuIndex(x, y)] ?? GOMOKU_EMPTY
+      return cell === GOMOKU_BLACK ? 'X' : cell === GOMOKU_WHITE ? 'O' : '.'
+    })
+    lines.push(`${String(y + 1).padStart(2)} ${cells.join(' ')}`)
+  }
+  return lines.join('\n')
 }
 
 export const GOMOKU_STAR_POINTS: readonly GomokuPoint[] = [
