@@ -29,5 +29,6 @@ inline DOM elements.
   `server/mcp/tools/games/`.
 - Human game notation is used at the MCP boundary (e.g. `H8` for Gomoku);
   internal engines keep their own representation.
-- `leave-room` is a user-confirmed action. It only applies to the current
-  waiting room, never to a running game, and must not be called autonomously.
+- `leave-room` exits the current room: in a waiting room it gives up the
+  seat, and in a running game it aborts the match as abandoned (no winner).
+  Agents may call it autonomously when they judge that leaving is correct.

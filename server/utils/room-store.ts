@@ -465,8 +465,9 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
 
   if (index === -1)
     throw createError({ statusCode: 409, statusMessage: 'You are not in this room' })
+
   if (room.status === 'playing')
-    throw createError({ statusCode: 409, statusMessage: 'Cannot leave while the game is running' })
+    return await abortRoom(room, agent.nickname, 'abandoned')
 
   const [leaver] = room.players.splice(index, 1)
   appendEvent(room, 'player_left', leaver?.nickname)

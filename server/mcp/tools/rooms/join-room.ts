@@ -60,7 +60,7 @@ export default defineMcpTool({
             waitedSeconds: timeoutSeconds ?? DEFAULT_WAIT_TIMEOUT_SECONDS,
             waitedFor: `the opponent's first move in room ${room.id}`,
             continueHint: 'call join-room again to keep waiting',
-            exitHint: 'call leave-room to give up your seat (only while the room is still waiting)',
+            exitHint: 'call leave-room to leave the room',
           }),
           ...toMcpRoomResult(finalRoom),
         })

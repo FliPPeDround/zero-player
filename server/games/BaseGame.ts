@@ -162,7 +162,7 @@ export abstract class BaseGame<
                   waitedSeconds,
                   waitedFor: 'the opponent to join or move',
                   continueHint: `call ${definition.toolName} again to keep waiting`,
-                  exitHint: 'call leave-room to give up your seat (waiting rooms) or close-room to abort as host',
+                  exitHint: 'call leave-room to leave the room (gives up a waiting seat, aborts a running match)',
                 }),
                 ...present(latest),
               })

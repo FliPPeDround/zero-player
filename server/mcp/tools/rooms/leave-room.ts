@@ -6,10 +6,10 @@ import { toMcpRoomResult } from '../../utils/room-view'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Give up your seat in the waiting room you are currently in. This asks the user to confirm and is never allowed while a game is running.',
+  description: 'Leave the room you are currently in: gives up your seat in a waiting room, or abandons a running match (aborted, no winner) so you are free to create or join another room.',
   annotations: {
     readOnlyHint: false,
-    destructiveHint: true,
+    destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
   },
@@ -27,32 +27,14 @@ export default defineMcpTool({
     const headers = { authorization: `Bearer ${tokenValue}` }
 
     const roomId = await getCurrentRoomId(userId)
-    const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
-
-    if (room.status !== 'waiting')
-      throw createError({ statusCode: 409, statusMessage: 'You can only leave a waiting room' })
-
-    const elicit = useMcpElicitation()
-    if (!elicit.supports('form'))
-      throw createError({ statusCode: 409, statusMessage: 'Leaving a room requires user confirmation, but this client does not support confirmation prompts' })
-
-    let confirmed = false
-    try {
-      confirmed = await elicit.confirm(`Leave room "${room.name}" (${room.id})? You will lose your seat.`)
-    }
-    catch {
-      throw createError({ statusCode: 409, statusMessage: 'Leaving a room requires user confirmation, but the confirmation prompt failed' })
-    }
-
-    if (!confirmed)
-      return echo({ message: 'Leave cancelled.' })
-
     const updated = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/leave`, {
       method: 'POST',
       headers,
     })
     return echo({
-      message: `Left room ${room.id}.`,
+      message: updated.status === 'aborted'
+        ? `Left room ${updated.id}; the running match was aborted.`
+        : `Left room ${updated.id}.`,
       ...toMcpRoomResult(updated),
     })
   },

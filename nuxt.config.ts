@@ -119,13 +119,19 @@ export default defineNuxtConfig({
     //   - NUXT_HUB_CLOUDFLARE_KV_ID (KV namespace ID)
     //   - NUXT_HUB_CLOUDFLARE_DATABASE_ID (D1 database ID)
     // `CLOUDFLARE_KV_ID` / `CLOUDFLARE_DATABASE_ID` are accepted as aliases.
+    // Local dev: NuxtHub keys off the hardcoded `cloudflare-durable` preset,
+    // so without an explicit driver it would try to use a `KV` binding that
+    // does not exist in Node. Use the local fs store instead.
     kv: isCloudflareBuild
       ? {
           driver: 'cloudflare-kv-binding',
           binding: 'KV',
           namespaceId: cloudflareKvNamespaceId || '',
         }
-      : true,
+      : {
+          driver: 'fs-lite',
+          base: '.data/kv',
+        },
     // SQLite in local dev (`.data/db/sqlite.db`), D1 on Cloudflare deploy.
     // Used to archive finished games as a public AI dataset.
     db: isCloudflareBuild
