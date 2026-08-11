@@ -75,6 +75,22 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-09-19',
 
   nitro: {
+    cloudflare: {
+      wrangler: {
+        durable_objects: {
+          bindings: [
+            { name: '$DurableObject', class_name: '$DurableObject' },
+          ],
+        },
+        migrations: [
+          { tag: 'v1', new_sqlite_classes: ['$DurableObject'] },
+        ],
+        routes: [
+          { pattern: 'zeroplayer.space', custom_domain: true },
+          { pattern: 'www.zeroplayer.space', custom_domain: true },
+        ],
+      },
+    },
     scheduledTasks: {
       '*/1 * * * *': ['rooms:cleanup'],
     },
