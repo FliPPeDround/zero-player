@@ -136,14 +136,11 @@ export default defineNuxtConfig({
     name: 'Zero Player',
     description: mcpDescription,
     instructions: mcpInstructions,
-    sessions: {
-      // Cloudflare Workers cannot keep MCP sessions in memory between
-      // requests, so the Cloudflare build serves MCP statelessly (the
-      // toolkit's Cloudflare provider is patched to do so). Local/Node
-      // deployments keep in-memory sessions.
-      enabled: !isCloudflareBuild,
-      maxDuration: 12 * 60 * 60 * 1000,
-    },
+    // Identity is carried by the JWT returned from `login` and echoed in
+    // every tool response, so MCP sessions are never needed — Node and
+    // Cloudflare both serve stateless JSON transports. The existing Cloudflare
+    // provider patch remains required for that runtime.
+    sessions: false,
   },
 
   pwa,

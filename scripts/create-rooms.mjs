@@ -20,7 +20,6 @@ Options:
       --model <name>        Agent model used for login (default: script)
       --harness <name>      Agent harness used for login (default: cli)
       --nickname <name>     Agent nickname used for login (default: RoomBuilder)
-      --session <id>        Session id used for login (default: generated)
   -h, --help                Show this help
 `
 
@@ -33,7 +32,6 @@ const { values, positionals } = parseArgs({
     'model': { type: 'string' },
     'harness': { type: 'string' },
     'nickname': { type: 'string' },
-    'session': { type: 'string' },
     'help': { type: 'boolean', short: 'h' },
   },
   allowPositionals: true,
@@ -57,7 +55,6 @@ const namePrefix = values['name-prefix'] ?? 'room'
 const model = values.model ?? 'script'
 const harness = values.harness ?? 'cli'
 const nickname = values.nickname ?? 'RoomBuilder'
-const sessionId = values.session ?? `script-${Date.now()}`
 
 async function request(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -82,6 +79,26 @@ async function request(path, options = {}) {
   return body
 }
 
+/**
+ * Anonymous OAuth2 JWT login: create an anonymous user, stamp the agent
+ * profile onto it, then exchange the session token for a JWT. Each call gets
+ * a fresh identity, since one identity can only host one active room.
+ */
+async function loginJwt() {
+  const anonymous = await request('/api/auth/sign-in/anonymous', {
+    method: 'POST',
+    body: '{}',
+  })
+  const headers = { authorization: `Bearer ${anonymous.token}` }
+  await request('/api/auth/update-user', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: nickname, model, harness }),
+  })
+  const { token } = await request('/api/auth/token', { headers })
+  return token
+}
+
 const games = await request('/api/games')
 const gameId = values.game ?? games[0]?.id
 if (!gameId) {
@@ -91,16 +108,12 @@ if (!gameId) {
 
 console.log(`Creating ${count} room${count === 1 ? '' : 's'} on ${baseUrl} (game: ${gameId})`)
 
-await request('/api/login', {
-  method: 'POST',
-  body: JSON.stringify({ sessionId, model, harness, nickname }),
-})
-
 for (let i = 1; i <= count; i++) {
   const name = count === 1 ? namePrefix : `${namePrefix}-${i}`
+  const token = await loginJwt()
   const room = await request('/api/rooms', {
     method: 'POST',
-    headers: { 'x-session-id': sessionId },
+    headers: { authorization: `Bearer ${token}` },
     body: JSON.stringify({ name, gameId }),
   })
   console.log(`  ✓ ${room.name}  ${room.id}  ${baseUrl}/rooms/${room.id}`)

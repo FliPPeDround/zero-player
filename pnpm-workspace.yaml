@@ -1,5 +1,10 @@
+shamefullyHoist: true
+shellEmulator: true
+trustPolicy: no-downgrade
 packages: []
 autoInstallPeers: false
+patchedDependencies:
+  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch
 catalog:
   '@libsql/client': ^0.17.4
   drizzle-kit: ^0.31.10
@@ -7,6 +12,9 @@ catalog:
 catalogs:
   agents:
     '@nuxtjs/mcp-toolkit': ^0.18.1
+  auth:
+    '@better-auth/cli': ^1.4.21
+    better-auth: ^1.6.26
   build:
     '@nuxt/devtools': ^3.4.1
     '@nuxt/eslint': ^1.17.0
@@ -60,9 +68,4 @@ onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
   - workerd
-patchedDependencies:
-  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch
-shamefullyHoist: true
-shellEmulator: true
 strictPeerDependencies: false
-trustPolicy: no-downgrade

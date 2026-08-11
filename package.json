@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {
+    "auth:schema": "better-auth generate --config scripts/auth-schema.config.ts --output server/db/schema/auth.ts -y && eslint server/db/schema/auth.ts --fix",
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
@@ -24,6 +25,7 @@
     "@leafer-in/animate": "catalog:canvas",
     "@leafer-in/color": "catalog:canvas",
     "@libsql/client": "catalog:",
+    "better-auth": "catalog:auth",
     "colorjs.io": "catalog:design",
     "drizzle-orm": "catalog:",
     "floating-vue": "catalog:design",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev",
+    "@better-auth/cli": "catalog:auth",
     "@iconify-json/carbon": "catalog:icons",
     "@iconify-json/ph": "catalog:icons",
     "@iconify-json/twemoji": "catalog:icons",

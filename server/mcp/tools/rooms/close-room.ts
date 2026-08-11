@@ -1,10 +1,8 @@
 import type { Room } from '#shared/rooms'
 import { z } from 'zod'
 import { getCurrentRoomId } from '../../utils/current-room'
+import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
 import { toMcpRoomResult } from '../../utils/room-view'
-import { getMcpUserId } from '../../utils/user-id'
-
-const AUTH_ID_PATTERN = /^\d{4}$/
 
 export default defineMcpTool({
   group: 'rooms',
@@ -16,16 +14,18 @@ export default defineMcpTool({
     openWorldHint: false,
   },
   inputSchema: {
-    authId: z.string().regex(AUTH_ID_PATTERN).describe('Your 4-digit auth ID from login; required for every stateful call'),
+    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
   },
   inputExamples: [
-    { authId: '4821' },
+    { token: '<token from login>' },
   ],
-  handler: async ({ authId }) => {
-    const event = useEvent()
-    const userId = getMcpUserId(event, authId)
+  handler: async ({ token }) => {
+    const agent = await requireAgentFromToken(token)
+    const userId = agent.sessionId
+    const tokenValue = String(token)
+    const echo = (result: Record<string, unknown>) => withTokenEcho(result, tokenValue)
+    const headers = { authorization: `Bearer ${tokenValue}` }
 
-    const headers = { 'x-session-id': userId }
     const roomId = await getCurrentRoomId(userId)
     const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
 
@@ -50,17 +50,17 @@ export default defineMcpTool({
     }
 
     if (!confirmed)
-      return { message: 'Close cancelled.' }
+      return echo({ message: 'Close cancelled.' })
 
     const updated = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/close`, {
       method: 'POST',
       headers,
     })
-    return {
+    return echo({
       message: updated.status === 'aborted'
         ? `Room ${room.id} aborted; no winner.`
         : `Room ${room.id} closed.`,
       ...toMcpRoomResult(updated),
-    }
+    })
   },
 })

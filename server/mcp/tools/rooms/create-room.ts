@@ -2,11 +2,9 @@ import type { Room } from '#shared/rooms'
 import { GAME_IDS } from '#shared/games'
 import { z } from 'zod'
 import { createRoomWaiter, describeRoomOutcome } from '../../utils/current-room'
+import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
 import { toMcpRoomResult } from '../../utils/room-view'
-import { getMcpUserId } from '../../utils/user-id'
 import { DEFAULT_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../../utils/wait-message'
-
-const AUTH_ID_PATTERN = /^\d{4}$/
 
 function createdMessage(room: Room, userId: string): string {
   if (room.status === 'playing') {
@@ -29,19 +27,23 @@ export default defineMcpTool({
   inputSchema: {
     name: z.string().trim().min(1).max(60).optional().describe('Human-friendly room name, defaults to "<nickname>\'s room"'),
     game: z.enum(GAME_IDS).describe('Game to play; choose from the known platform catalog'),
-    authId: z.string().regex(AUTH_ID_PATTERN).describe('Your 4-digit auth ID from login; required for every stateful call'),
+    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
     timeoutSeconds: z.number().int().min(5).max(300).optional().describe('How long to wait for another player to join before returning (default 60)'),
   },
   inputExamples: [
-    { game: 'gomoku', authId: '4821' },
-    { game: 'gomoku', name: 'Friday Night Brawl', authId: '4821' },
+    { game: 'gomoku', token: '<token from login>' },
+    { game: 'gomoku', name: 'Friday Night Brawl', token: '<token from login>' },
   ],
-  handler: async ({ name, game, authId, timeoutSeconds }) => {
-    const userId = getMcpUserId(useEvent(), authId)
+  handler: async ({ name, game, token, timeoutSeconds }) => {
+    const agent = await requireAgentFromToken(token)
+    const userId = agent.sessionId
+    const tokenValue = String(token)
     const timeoutMs = (timeoutSeconds ?? DEFAULT_WAIT_TIMEOUT_SECONDS) * 1000
+    const echo = (result: Record<string, unknown>) => withTokenEcho(result, tokenValue)
+
     const room = await $fetch('/api/rooms', {
       method: 'POST',
-      headers: { 'x-session-id': userId },
+      headers: { authorization: `Bearer ${tokenValue}` },
       body: { name, gameId: game },
     })
 
@@ -55,15 +57,15 @@ export default defineMcpTool({
       const latest = await $fetch<Room>(`/api/rooms/${encodeURIComponent(room.id)}`)
       if (isDone(latest)) {
         waiter.cancel()
-        return { message: createdMessage(latest, userId), ...toMcpRoomResult(latest) }
+        return echo({ message: createdMessage(latest, userId), ...toMcpRoomResult(latest) })
       }
 
       const outcome = await waiter.wait()
       const finalRoom = outcome.room ?? latest
       if (outcome.closed)
-        return { message: 'Room was closed.', ...toMcpRoomResult(finalRoom) }
+        return echo({ message: 'Room was closed.', ...toMcpRoomResult(finalRoom) })
       if (outcome.timedOut) {
-        return {
+        return echo({
           message: waitTimeoutMessage({
             waitedSeconds: timeoutSeconds ?? DEFAULT_WAIT_TIMEOUT_SECONDS,
             waitedFor: 'another player to join',
@@ -71,9 +73,9 @@ export default defineMcpTool({
             exitHint: 'call leave-room to give up your seat',
           }),
           ...toMcpRoomResult(finalRoom),
-        }
+        })
       }
-      return { message: createdMessage(finalRoom, userId), ...toMcpRoomResult(finalRoom) }
+      return echo({ message: createdMessage(finalRoom, userId), ...toMcpRoomResult(finalRoom) })
     }
     finally {
       waiter.cancel()
