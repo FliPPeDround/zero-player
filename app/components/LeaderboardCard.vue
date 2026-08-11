@@ -10,6 +10,7 @@ import FormSegmentedControl from '@antfu/design/components/Form/FormSegmentedCon
 import FormSelect from '@antfu/design/components/Form/FormSelect.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 import LayoutExpandableList from '@antfu/design/components/Layout/LayoutExpandableList.vue'
+import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
 
 interface LeaderboardEntry {
   key: string
@@ -38,7 +39,6 @@ const props = defineProps<{
 
 const dimension = ref<Dimension>('model')
 const gameFilter = ref('all')
-const minGames = ref(1)
 
 const dimensionOptions = [
   { value: 'model', label: 'Model' },
@@ -46,15 +46,13 @@ const dimensionOptions = [
   { value: 'combo', label: 'Model + Harness' },
 ]
 
-const minGamesOptions = [
-  { value: 1, label: '1+' },
-  { value: 3, label: '3+' },
-  { value: 5, label: '5+' },
-]
-
 const { data, pending, error, refresh } = await useFetch<LeaderboardResponse>(
   '/api/leaderboard',
   {
+    // The home page is prerendered at build time, where the D1 binding is not
+    // available. Fetching on the client keeps the leaderboard live and avoids
+    // baking a build-time 500 into the static page.
+    server: false,
     query: computed(() => ({
       gameId: gameFilter.value === 'all' ? undefined : gameFilter.value,
     })),
@@ -69,8 +67,7 @@ const gameOptions = computed(() => [
 ])
 
 const entries = computed(() => {
-  const list = data.value?.[dimension.value] ?? []
-  return list.filter(entry => entry.played >= minGames.value)
+  return data.value?.[dimension.value] ?? []
 })
 
 const seenFinishedIds = ref(new Set<string>())
@@ -116,49 +113,45 @@ watch(() => props.rooms, (rooms) => {
       </div>
     </div>
 
-    <div class="px-4 py-2 border-b border-base flex flex-wrap gap-3 items-center justify-between">
-      <span class="text-mini color-muted flex gap-1.5 items-center">
-        <span class="i-carbon-information" aria-hidden="true" />
-        Win rate counts finished matches only
-      </span>
-      <div class="flex gap-2 items-center">
-        <span class="text-mini color-faint">Min games</span>
-        <FormSegmentedControl v-model="minGames" :options="minGamesOptions" />
-      </div>
-    </div>
-
     <div>
       <FeedbackLoading v-if="pending && !data" panel text="Loading rankings" />
-      <FeedbackEmptyState
-        v-else-if="error"
-        icon="i-carbon-warning"
-        title="Rankings unavailable"
-      >
-        <template #hint>
-          {{ error }}
-        </template>
-      </FeedbackEmptyState>
-      <FeedbackEmptyState
+      <LayoutPanelGrids v-else-if="error" variant="dots" :size="18">
+        <FeedbackEmptyState
+          icon="i-carbon-warning"
+          title="Rankings unavailable"
+        >
+          <template #hint>
+            {{ error }}
+          </template>
+        </FeedbackEmptyState>
+      </LayoutPanelGrids>
+      <LayoutPanelGrids
         v-else-if="!data || data.totals.finished === 0"
-        icon="i-carbon-trophy"
-        title="No rankings yet"
+        variant="dots"
+        :size="18"
       >
-        <template #hint>
-          Finished matches will appear here once agents complete games.
-        </template>
-      </FeedbackEmptyState>
-      <FeedbackEmptyState
-        v-else-if="entries.length === 0"
-        icon="i-carbon-filter"
-        title="No entries match"
-      >
-        <template #hint>
-          Try lowering the minimum games filter.
-        </template>
-      </FeedbackEmptyState>
+        <FeedbackEmptyState
+          icon="i-carbon-trophy"
+          title="No rankings yet"
+        >
+          <template #hint>
+            Finished matches will appear here once agents complete games.
+          </template>
+        </FeedbackEmptyState>
+      </LayoutPanelGrids>
+      <LayoutPanelGrids v-else-if="entries.length === 0" variant="dots" :size="18">
+        <FeedbackEmptyState
+          icon="i-carbon-filter"
+          title="No entries match"
+        >
+          <template #hint>
+            No finished matches for this game yet.
+          </template>
+        </FeedbackEmptyState>
+      </LayoutPanelGrids>
       <LayoutExpandableList
         v-else
-        :key="`${dimension}-${gameFilter}-${minGames}`"
+        :key="`${dimension}-${gameFilter}`"
         :items="entries"
         :max="5"
         :step="5"
@@ -174,9 +167,10 @@ watch(() => props.rooms, (rooms) => {
               #{{ index + 1 }}
             </span>
             <div class="min-w-0">
-              <div class="flex gap-2 min-w-0 items-center">
+              <div class="flex flex-wrap gap-1.5 min-w-0 items-center">
                 <DisplayBadge
                   :text="item.key"
+                  :color="false"
                   rounded="full"
                   class="text-mini max-w-full min-w-0 overflow-hidden"
                 >
@@ -186,7 +180,7 @@ watch(() => props.rooms, (rooms) => {
                   <DisplayNumber :value="item.played" suffix=" games" />
                 </span>
               </div>
-              <div class="mt-1.5">
+              <div class="mt-1.5 max-w-52">
                 <DisplayProgressBar
                   :value="item.winRate"
                   :height="3"
@@ -216,6 +210,12 @@ watch(() => props.rooms, (rooms) => {
           </div>
         </template>
       </LayoutExpandableList>
+    </div>
+    <div class="px-4 py-2 border-t border-base">
+      <span class="text-mini color-faint flex gap-1.5 items-center">
+        <span class="i-carbon-information" aria-hidden="true" />
+        Win rate counts finished matches only
+      </span>
     </div>
   </LayoutCard>
 </template>

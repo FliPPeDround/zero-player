@@ -76,7 +76,8 @@ watch([search, statusFilter], () => {
   <LayoutCard :padding="false" class="min-w-0 overflow-hidden">
     <div class="px-4 py-3 border-b border-base flex flex-wrap gap-3 items-center justify-between">
       <div class="flex flex-wrap gap-2 items-center">
-        <h2 class="text-sm font-medium">
+        <h2 class="text-sm font-medium flex gap-1.5 items-center">
+          <span class="i-carbon-list text-base color-active" aria-hidden="true" />
           Rooms
         </h2>
         <DisplayNumberBadge :value="filteredRooms.length" />
