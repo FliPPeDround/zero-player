@@ -23,8 +23,10 @@ type ListListener = (message: RoomListMessage) => void
 type DetailListener = (message: RoomDetailMessage) => void
 
 const ROOM_KEY_PREFIX = 'rooms:'
+const SPECTATOR_KEY_PREFIX = 'spectators:'
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
+const latestRoomSnapshots = new Map<string, Room>()
 
 const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
 const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
@@ -69,6 +71,10 @@ function envMs(name: string, fallback: number): number {
 
 function roomKey(roomId: string): string {
   return `${ROOM_KEY_PREFIX}${roomId}`
+}
+
+function spectatorKey(roomId: string): string {
+  return `${SPECTATOR_KEY_PREFIX}${roomId}`
 }
 
 function randomId(prefix: string): string {
@@ -156,8 +162,24 @@ async function broadcastToDurable(payload: RoomHubBroadcast): Promise<void> {
  * peers. Only the internal WS bridge route should call this.
  */
 export function dispatchRoomHubBroadcast(payload: RoomHubBroadcast): void {
+  if ('room' in payload.detail) {
+    if (payload.detail.type === 'closed')
+      latestRoomSnapshots.delete(payload.roomId)
+    else
+      latestRoomSnapshots.set(payload.roomId, payload.detail.room)
+  }
   emitList(payload.list.type, payload.list.room)
   emitDetail(payload.roomId, payload.detail)
+}
+
+/**
+ * Latest full room seen by this isolate from the REST→Durable Object bridge.
+ * Used by the WebSocket handler for initial snapshots so a client joining
+ * mid-game does not briefly get an older KV snapshot that would revert the
+ * board it just received.
+ */
+export function getLatestRoomSnapshot(roomId: string): Room | null {
+  return latestRoomSnapshots.get(roomId) ?? null
 }
 
 /**
@@ -250,6 +272,7 @@ function addPlayer(room: Room, agent: AgentIdentity): RoomPlayer {
 
 async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<void> {
   room.closesAt = computeClosesAt(room)
+  room.spectatorCount = await kv.get<number>(spectatorKey(room.id)) ?? room.spectatorCount
   const ttl = ttlSecondsUntil(room)
   await kv.set(roomKey(room.id), room, ttl ? { ttl } : undefined)
   const list = emitList(type, room)
@@ -263,6 +286,7 @@ async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promi
     return null
   appendEvent(room, 'room_closed', by, { reason })
   await kv.del(roomKey(roomId))
+  await kv.del(spectatorKey(roomId))
   const list = emitList('deleted', room)
   const detail = emitDetail(roomId, { type: 'closed', room })
   await broadcastToDurable({ roomId, list, detail })
@@ -359,6 +383,9 @@ export async function listRooms(query: {
   const keys = await kv.keys(ROOM_KEY_PREFIX)
   const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
   const rooms = storedRooms.filter((room): room is Room => room !== null)
+  await Promise.all(rooms.map(async (room) => {
+    room.spectatorCount = await kv.get<number>(spectatorKey(room.id)) ?? room.spectatorCount
+  }))
   rooms.forEach(normalizeRoomSides)
 
   return rooms
@@ -377,8 +404,10 @@ export async function listRooms(query: {
 
 export async function getRoom(roomId: string): Promise<Room | null> {
   const room = await kv.get<Room>(roomKey(roomId))
-  if (room)
+  if (room) {
     normalizeRoomSides(room)
+    room.spectatorCount = await kv.get<number>(spectatorKey(roomId)) ?? room.spectatorCount
+  }
   return room
 }
 
@@ -454,14 +483,21 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
 }
 
 export async function setSpectatorCount(roomId: string, count: number): Promise<void> {
-  const room = await getRoom(roomId)
+  const cached = getLatestRoomSnapshot(roomId)
+  const stored = await getRoom(roomId)
+  const room = cached && stored && cached.events.length > stored.events.length ? cached : stored
   if (!room)
     return
   const normalized = Math.max(0, count)
   if (room.spectatorCount === normalized)
     return
+  const ttl = ttlSecondsUntil(room)
+  // Keep spectator counts out of the authoritative room document: writing the
+  // full room here can overwrite a newer move with a stale snapshot when the
+  // WebSocket Durable Object and the REST Worker race on KV.
+  await kv.set(spectatorKey(roomId), normalized, ttl ? { ttl } : undefined)
   room.spectatorCount = normalized
-  await persistRoom(room, 'updated')
+  emitList('updated', room)
 }
 
 export async function emitGameMove(roomId: string, actor: string, payload: Record<string, unknown>): Promise<void> {
@@ -503,14 +539,14 @@ export async function submitGameMove(
 
   if (game.status === 'finished') {
     const winnerNickname = room.players.find(player => player.sessionId === game.winner)?.nickname
-    await finishGame(roomId, winnerNickname ?? game.winner)
+    await finishGame(roomId, winnerNickname ?? game.winner, room)
   }
 
   return await getRoom(roomId) ?? room
 }
 
-export async function finishGame(roomId: string, winner?: string): Promise<void> {
-  const room = await getRoom(roomId)
+export async function finishGame(roomId: string, winner?: string, existingRoom?: Room): Promise<void> {
+  const room = existingRoom ?? await getRoom(roomId)
   if (!room || room.status !== 'playing')
     return
   room.status = 'finished'

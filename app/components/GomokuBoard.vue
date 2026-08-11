@@ -339,9 +339,9 @@ watch(() => colorMode.value, () => {
     <div class="board-labels" aria-hidden="true">
       <span
         v-for="index in GOMOKU_SIZE"
-        :key="`top-${index}`"
+        :key="`bottom-${index}`"
         class="board-label text-micro color-faint font-mono"
-        :style="{ left: `${linePositionRatio(index - 1) * 100}%`, top: `${BOARD_LABEL_RATIO * 100}%` }"
+        :style="{ left: `${linePositionRatio(index - 1) * 100}%`, top: `${(1 - BOARD_LABEL_RATIO) * 100}%` }"
       >
         {{ gomokuColumnLabel(index - 1) }}
       </span>
@@ -351,7 +351,7 @@ watch(() => colorMode.value, () => {
         class="board-label text-micro color-faint font-mono"
         :style="{ left: `${BOARD_LABEL_RATIO * 100}%`, top: `${linePositionRatio(index - 1) * 100}%` }"
       >
-        {{ index }}
+        {{ GOMOKU_SIZE - index + 1 }}
       </span>
     </div>
   </div>

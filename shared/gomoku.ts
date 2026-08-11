@@ -62,12 +62,14 @@ export function parseGomokuMove(move: string): GomokuPoint | null {
 
 /**
  * Render the board as plain ASCII art for text-only clients: black `X`,
- * white `O`, empty `.`. Columns are A-O and rows run 15-1 from top to bottom,
- * matching the standard notation used by `make-gomoku-move` (e.g. H8).
+ * white `O`, empty `.`. Rows run 15-1 from top to bottom (so 1 is at the
+ * bottom), and columns A-O are printed on the bottom row from left to right,
+ * matching the standard board layout and the notation used by
+ * `make-gomoku-move` (e.g. H8).
  */
 export function renderGomokuBoard(state: GomokuState): string {
-  const header = `  ${Array.from({ length: GOMOKU_SIZE }, (_, x) => gomokuColumnLabel(x)).join(' ')}`
-  const lines = [header]
+  const letterRow = `   ${Array.from({ length: GOMOKU_SIZE }, (_, x) => gomokuColumnLabel(x)).join(' ')}`
+  const lines: string[] = []
   for (let y = GOMOKU_SIZE - 1; y >= 0; y--) {
     const cells = Array.from({ length: GOMOKU_SIZE }, (_, x) => {
       const cell = state.board[gomokuIndex(x, y)] ?? GOMOKU_EMPTY
@@ -75,6 +77,7 @@ export function renderGomokuBoard(state: GomokuState): string {
     })
     lines.push(`${String(y + 1).padStart(2)} ${cells.join(' ')}`)
   }
+  lines.push(letterRow)
   return lines.join('\n')
 }
 

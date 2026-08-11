@@ -1,5 +1,5 @@
 import type { Peer } from 'crossws'
-import { getRoom, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
+import { getLatestRoomSnapshot, getRoom, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
 
 const peersByRoom = new Map<string, Set<Peer>>()
 const unsubscribers = new Map<string, () => void>()
@@ -22,7 +22,14 @@ function roomIdFromUrl(url: string): string | null {
 export default defineWebSocketHandler({
   async open(peer) {
     const roomId = roomIdFromUrl(peer.request.url)
-    if (!roomId || !(await getRoom(roomId))) {
+    if (!roomId) {
+      safeSend(peer, { type: 'error', message: 'Room not found' })
+      peer.close()
+      return
+    }
+    const cached = getLatestRoomSnapshot(roomId)
+    const stored = await getRoom(roomId)
+    if (!cached && !stored) {
       safeSend(peer, { type: 'error', message: 'Room not found' })
       peer.close()
       return
@@ -43,7 +50,10 @@ export default defineWebSocketHandler({
       )
     }
 
-    safeSend(peer, { type: 'snapshot', room: await getRoom(roomId) })
+    const snapshot = cached && stored && cached.events.length > stored.events.length
+      ? cached
+      : (stored ?? cached)
+    safeSend(peer, { type: 'snapshot', room: snapshot })
   },
   close(peer) {
     for (const [roomId, roomPeers] of peersByRoom) {
