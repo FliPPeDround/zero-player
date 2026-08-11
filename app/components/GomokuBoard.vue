@@ -72,7 +72,9 @@ function stoneMetrics(x: number, y: number) {
   const { padding, cell } = boardMetrics()
   return {
     cx: padding + x * cell,
-    cy: padding + y * cell,
+    // Internal y=0 is notation row 1 (bottom), while canvas y grows downward,
+    // so flip vertically to keep e.g. H10 on the line labelled 10.
+    cy: padding + (GOMOKU_SIZE - 1 - y) * cell,
     radius: cell * 0.44,
     cell,
   }

@@ -389,7 +389,7 @@ useHead({
             </DisplayKeyValue>
           </LayoutCard>
 
-          <LayoutCard :padding="false" class="flex flex-1 flex-col min-h-0 min-w-0">
+          <LayoutCard :padding="false" class="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
             <div class="px-3 py-2 border-b border-base flex items-center">
               <div class="flex gap-2 items-center">
                 <h2 class="text-sm font-medium">
@@ -399,7 +399,7 @@ useHead({
               </div>
             </div>
             <div class="lg:flex-1 lg:min-h-0 lg:relative">
-              <div ref="logRef" class="scroll-fade-y h-[420px] overflow-y-auto lg:inset-0 lg:absolute">
+              <div ref="logRef" class="scroll-fade-y h-[420px] overflow-y-auto lg:h-auto lg:inset-0 lg:absolute">
                 <ol v-if="room.events.length" class="py-1">
                   <li
                     v-for="event in room.events"
