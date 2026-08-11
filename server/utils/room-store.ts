@@ -30,8 +30,34 @@ const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
 const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
 const TERMINAL_RETENTION_MS = envMs('ROOMS_TERMINAL_RETENTION_MS', 10 * 60 * 1000)
 const KV_TTL_MAX_SECONDS = 60 * 60 * 24 * 7
+const DURABLE_BINDING_NAME = '$DurableObject'
+const DURABLE_INSTANCE_NAME = 'server'
 
 let eventCounter = 0
+
+export interface RoomHubBroadcast {
+  roomId: string
+  list: RoomUpdateListMessage
+  detail: RoomDetailMessage
+}
+
+export type RoomUpdateListMessage
+  = { type: 'created' | 'updated', room: RoomSummary }
+    | { type: 'deleted', room: RoomSummary }
+
+interface DurableObjectStub {
+  fetch: (request: Request) => Promise<Response>
+}
+
+interface DurableObjectBinding {
+  idFromName: (name: string) => unknown
+  get: (id: unknown) => DurableObjectStub
+}
+
+type DurableGlobal = typeof globalThis & {
+  __env__?: Record<string, unknown>
+  __zeroPlayerDurableObject?: boolean
+}
 
 function envMs(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -54,21 +80,84 @@ function nextEventId(): string {
   return `evt-${Date.now().toString(36)}-${eventCounter.toString(36)}`
 }
 
-function emitList(type: RoomListMessage['type'], room: Room): void {
-  const summary = toRoomSummary(room)
-  const message: RoomListMessage = type === 'deleted'
+function emitList(type: 'created' | 'updated' | 'deleted', room: Room | RoomSummary): RoomUpdateListMessage {
+  const summary = 'hostSessionId' in room ? toRoomSummary(room) : room
+  const message: RoomUpdateListMessage = type === 'deleted'
     ? { type: 'deleted', room: summary }
     : { type: type === 'created' ? 'created' : 'updated', room: summary }
   for (const listener of listListeners)
     listener(message)
+  return message
 }
 
-function emitDetail(roomId: string, message: RoomDetailMessage): void {
+function emitDetail(roomId: string, message: RoomDetailMessage): RoomDetailMessage {
   const listeners = detailListeners.get(roomId)
   if (!listeners)
-    return
+    return message
   for (const listener of listeners)
     listener(message)
+  return message
+}
+
+/**
+ * Resolve the Nitro WebSocket Durable Object stub when running in a regular
+ * Cloudflare Worker. WebSocket handlers live in `$DurableObject`, so room
+ * updates produced by REST/scheduled work must be forwarded there to reach
+ * browser peers. Inside the Durable Object itself we skip the forward and
+ * emit locally instead.
+ */
+function getDurableObjectStub(): DurableObjectStub | null {
+  const g = globalThis as DurableGlobal
+  if (g.__zeroPlayerDurableObject)
+    return null
+  try {
+    const event = useEvent()
+    const durableFetch = (event.context._platform?.cloudflare as {
+      durableFetch?: (request: Request) => Promise<Response>
+    } | undefined)?.durableFetch
+    if (typeof durableFetch === 'function')
+      return { fetch: request => durableFetch(request) }
+  }
+  catch {
+    // Not inside a Nitro request (e.g. a scheduled task): fall back to the
+    // Durable Object binding directly.
+  }
+  const binding = g.__env__?.[DURABLE_BINDING_NAME] as DurableObjectBinding | undefined
+  if (!binding)
+    return null
+  try {
+    return binding.get(binding.idFromName(DURABLE_INSTANCE_NAME))
+  }
+  catch {
+    return null
+  }
+}
+
+async function broadcastToDurable(payload: RoomHubBroadcast): Promise<void> {
+  const stub = getDurableObjectStub()
+  if (!stub)
+    return
+  try {
+    await stub.fetch(new Request('http://internal/api/internal/ws-broadcast', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    }))
+  }
+  catch (error) {
+    // The room is already persisted and emitted locally; a failed WS bridge
+    // must not fail the request. Peers will catch up on their next snapshot.
+    console.error('[rooms] failed to broadcast to WebSocket durable object:', error)
+  }
+}
+
+/**
+ * Re-dispatch a room broadcast inside the Durable Object that owns WebSocket
+ * peers. Only the internal WS bridge route should call this.
+ */
+export function dispatchRoomHubBroadcast(payload: RoomHubBroadcast): void {
+  emitList(payload.list.type, payload.list.room)
+  emitDetail(payload.roomId, payload.detail)
 }
 
 /**
@@ -163,8 +252,9 @@ async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<voi
   room.closesAt = computeClosesAt(room)
   const ttl = ttlSecondsUntil(room)
   await kv.set(roomKey(room.id), room, ttl ? { ttl } : undefined)
-  emitList(type, room)
-  emitDetail(room.id, { type: 'update', room })
+  const list = emitList(type, room)
+  const detail = emitDetail(room.id, { type: 'update', room })
+  await broadcastToDurable({ roomId: room.id, list, detail })
 }
 
 async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promise<Room | null> {
@@ -173,8 +263,9 @@ async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promi
     return null
   appendEvent(room, 'room_closed', by, { reason })
   await kv.del(roomKey(roomId))
-  emitList('deleted', room)
-  emitDetail(roomId, { type: 'closed', room })
+  const list = emitList('deleted', room)
+  const detail = emitDetail(roomId, { type: 'closed', room })
+  await broadcastToDurable({ roomId, list, detail })
   return room
 }
 

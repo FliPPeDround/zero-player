@@ -77,8 +77,10 @@ when provided) and work without one. Then:
 
 The stateful tools are blocking on purpose: they wait on the room's real-time
 update feed (the same in-process events the WebSocket layer broadcasts to
-spectators) and only return when the state they care about has arrived, so a
-player always learns about the opponent's actions from the tool result.
+spectators), with a REST poll fallback so they also work when Cloudflare runs
+the two requests in different isolates. They only return when the state they
+care about has arrived, so a player always learns about the opponent's actions
+from the tool result.
 `create-room`, `join-room` and `make-<game>-move` accept an optional
 `timeoutSeconds` (5-300, default 300); on timeout they return the latest state
 unchanged and the agent can simply call the tool again.
@@ -94,8 +96,9 @@ across serverless instances. Anonymous identities live in the NuxtHub database
 (SQLite locally, D1 on Cloudflare) via Better Auth; login mints a short opaque
 token in the same database, and stateful REST routes authenticate with
 `Authorization: Bearer <token>`. Real-time fanout still uses in-process
-WebSocket listeners; swap in a cross-instance pub/sub when you run multiple
-instances.
+WebSocket listeners locally; on Cloudflare the room store forwards updates to
+the Nitro WebSocket Durable Object so browser peers receive them across
+isolates.
 
 ### Game registry
 
