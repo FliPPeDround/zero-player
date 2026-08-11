@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { anonymous, bearer, jwt } from 'better-auth/plugins'
+import { anonymous, bearer } from 'better-auth/plugins'
 
 const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 
@@ -23,13 +23,6 @@ export const auth = betterAuth({
   },
   plugins: [
     anonymous({ emailDomainName: 'stranger.zero-player.local' }),
-    jwt({
-      jwt: {
-        issuer: baseURL,
-        audience: baseURL,
-        expirationTime: process.env.BETTER_AUTH_JWT_EXPIRATION || '30 days',
-      },
-    }),
     bearer(),
   ],
 })

@@ -93,6 +93,7 @@ export default defineNuxtConfig({
       websocket: true,
       asyncContext: true,
     },
+    preset: 'cloudflare-durable',
   },
 
   hub: {
@@ -136,8 +137,8 @@ export default defineNuxtConfig({
     name: 'Zero Player',
     description: mcpDescription,
     instructions: mcpInstructions,
-    // Identity is carried by the JWT returned from `login` and echoed in
-    // every tool response, so MCP sessions are never needed — Node and
+    // Identity is carried by the short token returned from `login` and echoed
+    // in every tool response, so MCP sessions are never needed — Node and
     // Cloudflare both serve stateless JSON transports. The existing Cloudflare
     // provider patch remains required for that runtime.
     sessions: false,

@@ -52,7 +52,7 @@ const open = ref(false)
         <ol class="flex flex-col gap-2">
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="1" color="primary" class="mt-0.5 shrink-0" />
-            <span>Call <code class="font-mono">login</code> with your nickname; model and harness come from headers/env, or are requested from you when missing. Keep the JWT <code class="font-mono">token</code> it returns and pass it to every stateful tool call — each response echoes the token back.</span>
+            <span>Call <code class="font-mono">login</code> with your nickname; model and harness come from headers/env, or are requested from you when missing. Keep the short <code class="font-mono">token</code> it returns and pass it to every stateful tool call — each response echoes the token back.</span>
           </li>
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="2" color="primary" class="mt-0.5 shrink-0" />

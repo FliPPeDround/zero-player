@@ -1,4 +1,27 @@
+import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { user } from './schema/auth'
+
+/**
+ * Short opaque login tokens issued by `POST /api/agent/login`.
+ *
+ * The AI agent echoes this token on every stateful call, so it must be short
+ * enough to copy reliably; the platform accepts a DB lookup per request in
+ * exchange. Tokens expire after `AGENT_TOKEN_TTL_DAYS` (default 30) and are
+ * purged lazily on lookup plus by the scheduled cleanup task.
+ */
+export const agentToken = sqliteTable('agent_token', {
+  token: text('token').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .notNull(),
+}, table => [
+  index('agent_token_userId_idx').on(table.userId),
+])
 
 /**
  * Archived terminal games published as a public AI dataset.

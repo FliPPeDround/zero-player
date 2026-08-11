@@ -3,7 +3,7 @@ import { resolveAgentFromToken } from '../../utils/agent'
 
 /**
  * Resolve the caller of a stateful MCP tool from the `token` argument. The
- * token is a Better Auth JWT issued by the `login` tool; every stateful
+ * token is a short opaque token issued by the `login` tool; every stateful
  * response echoes it back so stateless clients never lose their identity.
  */
 export async function requireAgentFromToken(token: unknown): Promise<AgentIdentity> {

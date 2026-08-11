@@ -80,22 +80,15 @@ async function request(path, options = {}) {
 }
 
 /**
- * Anonymous OAuth2 JWT login: create an anonymous user, stamp the agent
- * profile onto it, then exchange the session token for a JWT. Each call gets
- * a fresh identity, since one identity can only host one active room.
+ * Standard REST login: creates an anonymous identity and returns a short
+ * opaque token. Each call gets a fresh identity, since one identity can only
+ * host one active room.
  */
-async function loginJwt() {
-  const anonymous = await request('/api/auth/sign-in/anonymous', {
+async function loginToken() {
+  const { token } = await request('/api/agent/login', {
     method: 'POST',
-    body: '{}',
+    body: JSON.stringify({ nickname, model, harness }),
   })
-  const headers = { authorization: `Bearer ${anonymous.token}` }
-  await request('/api/auth/update-user', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ name: nickname, model, harness }),
-  })
-  const { token } = await request('/api/auth/token', { headers })
   return token
 }
 
@@ -110,7 +103,7 @@ console.log(`Creating ${count} room${count === 1 ? '' : 's'} on ${baseUrl} (game
 
 for (let i = 1; i <= count; i++) {
   const name = count === 1 ? namePrefix : `${namePrefix}-${i}`
-  const token = await loginJwt()
+  const token = await loginToken()
   const room = await request('/api/rooms', {
     method: 'POST',
     headers: { authorization: `Bearer ${token}` },

@@ -1,9 +1,8 @@
 import z from 'zod'
-import { auth } from '../../utils/auth'
 
 export default defineMcpTool({
   name: 'login',
-  description: 'Login to the Zero Player platform with your model, harness and nickname. Ask the user to provide and confirm these values — you cannot reliably know your own model name, harness, or a preferred nickname, so do not guess them. Returns a JWT token: keep it in the conversation and pass it to every stateful tool call.',
+  description: 'Login to the Zero Player platform with your model, harness and nickname. Ask the user to provide and confirm these values — you cannot reliably know your own model name, harness, or a preferred nickname, so do not guess them. Returns a short login token: keep it in the conversation and pass it to every stateful tool call.',
   inputSchema: {
     model: z.string().describe('The name of the model that the current agent is running on (e.g. the agent\'s own model name)'),
     harness: z.string().describe('The name of the Horizon harness the agent is running in'),
@@ -13,21 +12,12 @@ export default defineMcpTool({
     { model: 'gpt-5', harness: 'horizon', nickname: 'Agent' },
   ],
   handler: async ({ model, harness, nickname }) => {
-    // Stranger auth: create an anonymous Better Auth user, stamp the agent
-    // profile onto it, then mint the JWT the agent will carry everywhere.
-    const anonymous = await auth.api.signInAnonymous()
-    const headers = new Headers({ authorization: `Bearer ${anonymous.token}` })
-
-    await auth.api.updateUser({
-      headers,
-      body: {
-        name: nickname,
-        model,
-        harness,
-      },
+    // Standard REST login: creates the anonymous identity and mints the short
+    // token the agent will carry everywhere.
+    const { token } = await $fetch<{ token: string }>('/api/agent/login', {
+      method: 'POST',
+      body: { model, harness, nickname },
     })
-
-    const { token } = await auth.api.getToken({ headers })
 
     return {
       token,
