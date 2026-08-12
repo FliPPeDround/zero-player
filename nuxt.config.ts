@@ -89,10 +89,13 @@ export default defineNuxtConfig({
           { pattern: 'zeroplayer.space', custom_domain: true },
           { pattern: 'www.zeroplayer.space', custom_domain: true },
         ],
+        triggers: {
+          crons: ['0 2 * * *'],
+        },
       },
     },
     scheduledTasks: {
-      '*/5 * * * *': ['rooms:cleanup'],
+      '0 2 * * *': ['rooms:cleanup'],
     },
     esbuild: {
       options: {
