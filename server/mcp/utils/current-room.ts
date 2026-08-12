@@ -1,18 +1,19 @@
 import type { Room } from '#shared/rooms'
 import type { RoomDetailMessage } from '../../utils/room-store'
-import { findActiveRoomForSession, onRoomDetail } from '../../utils/room-store'
+import { getSessionRoomId, onRoomDetail } from '../../utils/room-store'
 
 /**
- * Adaptive REST poll fallback: fast at first, then backs off so long waits
- * stay cheap while turns are still detected quickly.
+ * Adaptive REST poll fallback: a little fast at first, then backs off hard.
+ * LLM opponents normally take tens of seconds per move, so a 5-15s poll is
+ * still snappy for lockstep play while keeping KV reads near the minimum.
  */
-const POLL_INITIAL_INTERVAL_MS = 1000
-const POLL_FAST_WINDOW_MS = 10_000
-const POLL_MEDIUM_INTERVAL_MS = 2000
-const POLL_MEDIUM_WINDOW_MS = 30_000
-const POLL_SLOW_INTERVAL_MS = 3000
-const POLL_SLOW_WINDOW_MS = 60_000
-const POLL_MAX_INTERVAL_MS = 5000
+const POLL_INITIAL_INTERVAL_MS = 5000
+const POLL_FAST_WINDOW_MS = 30_000
+const POLL_MEDIUM_INTERVAL_MS = 10_000
+const POLL_MEDIUM_WINDOW_MS = 90_000
+const POLL_SLOW_INTERVAL_MS = 15_000
+const POLL_SLOW_WINDOW_MS = 150_000
+const POLL_MAX_INTERVAL_MS = 15_000
 
 function pollDelayMs(elapsedMs: number): number {
   if (elapsedMs < POLL_FAST_WINDOW_MS)
@@ -30,10 +31,10 @@ function pollDelayMs(elapsedMs: number): number {
  * then call the standard `/api/rooms/:id/*` endpoints with that id.
  */
 export async function getCurrentRoomId(sessionId: string): Promise<string> {
-  const room = await findActiveRoomForSession(sessionId)
-  if (!room)
+  const roomId = await getSessionRoomId(sessionId)
+  if (!roomId)
     throw createError({ statusCode: 404, statusMessage: 'You are not in any active room' })
-  return room.id
+  return roomId
 }
 
 /**

@@ -23,12 +23,14 @@ type ListListener = (message: RoomListMessage) => void
 type DetailListener = (message: RoomDetailMessage) => void
 
 const ROOM_KEY_PREFIX = 'rooms:'
-const SPECTATOR_KEY_PREFIX = 'spectators:'
 const SESSION_KEY_PREFIX = 'session:'
 const SESSION_INDEX_TTL_SECONDS = 60 * 60 * 24 * 7
+const ROOM_LIST_CACHE_TTL_MS = 10_000
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
 const latestRoomSnapshots = new Map<string, Room>()
+const spectatorCounts = new Map<string, number>()
+let roomListCache: { rooms: RoomSummary[], builtAt: number } | null = null
 
 const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
 const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
@@ -75,10 +77,6 @@ function roomKey(roomId: string): string {
   return `${ROOM_KEY_PREFIX}${roomId}`
 }
 
-function spectatorKey(roomId: string): string {
-  return `${SPECTATOR_KEY_PREFIX}${roomId}`
-}
-
 function sessionKey(sessionId: string): string {
   return `${SESSION_KEY_PREFIX}${sessionId}`
 }
@@ -109,9 +107,31 @@ function emitList(type: 'created' | 'updated' | 'deleted', room: Room | RoomSumm
   const message: RoomUpdateListMessage = type === 'deleted'
     ? { type: 'deleted', room: summary }
     : { type: type === 'created' ? 'created' : 'updated', room: summary }
+  updateRoomListCache(type, summary)
   for (const listener of listListeners)
     listener(message)
   return message
+}
+
+/**
+ * Keep the in-isolate lobby cache in sync with the update feed. The cache is
+ * only a read-avoidance layer: it expires after a few seconds, so rooms
+ * created/deleted in other isolates are picked up on the next full KV scan.
+ */
+function updateRoomListCache(type: 'created' | 'updated' | 'deleted', room: RoomSummary): void {
+  if (!roomListCache)
+    return
+  if (type === 'deleted') {
+    roomListCache.rooms = roomListCache.rooms.filter(item => item.id !== room.id)
+  }
+  else {
+    const index = roomListCache.rooms.findIndex(item => item.id === room.id)
+    if (index === -1)
+      roomListCache.rooms.unshift(room)
+    else
+      roomListCache.rooms[index] = room
+  }
+  roomListCache.rooms.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 function emitDetail(roomId: string, message: RoomDetailMessage): RoomDetailMessage {
@@ -290,7 +310,7 @@ function addPlayer(room: Room, agent: AgentIdentity): RoomPlayer {
 
 async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<void> {
   room.closesAt = computeClosesAt(room)
-  room.spectatorCount = await kv.get<number>(spectatorKey(room.id)) ?? room.spectatorCount
+  room.spectatorCount = spectatorCounts.get(room.id) ?? room.spectatorCount
   const ttl = ttlSecondsUntil(room)
   await kv.set(roomKey(room.id), room, ttl ? { ttl } : undefined)
   const list = emitList(type, room)
@@ -304,7 +324,7 @@ async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promi
     return null
   appendEvent(room, 'room_closed', by, { reason })
   await kv.del(roomKey(roomId))
-  await kv.del(spectatorKey(roomId))
+  spectatorCounts.delete(roomId)
   await clearRoomSessions(room)
   const list = emitList('deleted', room)
   const detail = emitDetail(roomId, { type: 'closed', room })
@@ -401,15 +421,30 @@ export async function listRooms(query: {
 } = {}): Promise<RoomSummary[]> {
   const search = query.search?.trim().toLowerCase()
   const limit = Math.min(query.limit ?? 100, 200)
-  const keys = await kv.keys(ROOM_KEY_PREFIX)
-  const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
-  const rooms = storedRooms.filter((room): room is Room => room !== null)
-  await Promise.all(rooms.map(async (room) => {
-    room.spectatorCount = await kv.get<number>(spectatorKey(room.id)) ?? room.spectatorCount
-  }))
-  rooms.forEach(normalizeRoomSides)
 
-  return rooms
+  const cached = roomListCache && Date.now() - roomListCache.builtAt < ROOM_LIST_CACHE_TTL_MS
+    ? roomListCache.rooms
+    : null
+
+  let summaries: RoomSummary[]
+  if (cached) {
+    summaries = cached
+  }
+  else {
+    const keys = await kv.keys(ROOM_KEY_PREFIX)
+    const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
+    const rooms = storedRooms.filter((room): room is Room => room !== null)
+    rooms.forEach((room) => {
+      normalizeRoomSides(room)
+      room.spectatorCount = spectatorCounts.get(room.id) ?? room.spectatorCount
+    })
+    summaries = rooms
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(toRoomSummary)
+    roomListCache = { rooms: summaries, builtAt: Date.now() }
+  }
+
+  return summaries
     .filter(room => !query.status || room.status === query.status)
     .filter(room => !query.gameId || room.gameId === query.gameId)
     .filter(room => !search || (
@@ -420,16 +455,24 @@ export async function listRooms(query: {
     ))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit)
-    .map(toRoomSummary)
 }
 
 export async function getRoom(roomId: string): Promise<Room | null> {
   const room = await kv.get<Room>(roomKey(roomId))
   if (room) {
     normalizeRoomSides(room)
-    room.spectatorCount = await kv.get<number>(spectatorKey(roomId)) ?? room.spectatorCount
+    room.spectatorCount = spectatorCounts.get(roomId) ?? room.spectatorCount
   }
   return room
+}
+
+/**
+ * Read only the session→room index. Callers that need the room itself (or an
+ * active-room guarantee) should use `findActiveRoomForSession` instead; MCP
+ * move/lookup flows use this to avoid loading the whole room twice.
+ */
+export async function getSessionRoomId(sessionId: string): Promise<string | null> {
+  return await kv.get<string>(sessionKey(sessionId))
 }
 
 export async function requireRoom(roomId: string): Promise<Room> {
@@ -513,19 +556,17 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
 
 export async function setSpectatorCount(roomId: string, count: number): Promise<void> {
   const cached = getLatestRoomSnapshot(roomId)
-  const stored = await getRoom(roomId)
-  const room = cached && stored && cached.events.length > stored.events.length ? cached : stored
+  // Spectator counts are ephemeral UI data, so they deliberately live only in
+  // memory. The Durable Object keeps them for the rooms it has seen; on a cold
+  // start the count starts at the stored value until the next WS open/close.
+  const room = cached ?? await getRoom(roomId)
   if (!room)
     return
   const normalized = Math.max(0, count)
   if (room.spectatorCount === normalized)
     return
-  const ttl = ttlSecondsUntil(room)
-  // Keep spectator counts out of the authoritative room document: writing the
-  // full room here can overwrite a newer move with a stale snapshot when the
-  // WebSocket Durable Object and the REST Worker race on KV.
-  await kv.set(spectatorKey(roomId), normalized, ttl ? { ttl } : undefined)
   room.spectatorCount = normalized
+  spectatorCounts.set(roomId, normalized)
   emitList('updated', room)
 }
 
@@ -571,7 +612,7 @@ export async function submitGameMove(
     await finishGame(roomId, winnerNickname ?? game.winner, room)
   }
 
-  return await getRoom(roomId) ?? room
+  return room
 }
 
 export async function finishGame(roomId: string, winner?: string, existingRoom?: Room): Promise<void> {
