@@ -24,6 +24,8 @@ type DetailListener = (message: RoomDetailMessage) => void
 
 const ROOM_KEY_PREFIX = 'rooms:'
 const SPECTATOR_KEY_PREFIX = 'spectators:'
+const SESSION_KEY_PREFIX = 'session:'
+const SESSION_INDEX_TTL_SECONDS = 60 * 60 * 24 * 7
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
 const latestRoomSnapshots = new Map<string, Room>()
@@ -75,6 +77,22 @@ function roomKey(roomId: string): string {
 
 function spectatorKey(roomId: string): string {
   return `${SPECTATOR_KEY_PREFIX}${roomId}`
+}
+
+function sessionKey(sessionId: string): string {
+  return `${SESSION_KEY_PREFIX}${sessionId}`
+}
+
+async function setSessionRoom(sessionId: string, roomId: string): Promise<void> {
+  await kv.set(sessionKey(sessionId), roomId, { ttl: SESSION_INDEX_TTL_SECONDS })
+}
+
+async function clearSessionRoom(sessionId: string): Promise<void> {
+  await kv.del(sessionKey(sessionId))
+}
+
+async function clearRoomSessions(room: Room): Promise<void> {
+  await Promise.all(room.players.map(player => clearSessionRoom(player.sessionId)))
 }
 
 function randomId(prefix: string): string {
@@ -287,6 +305,7 @@ async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promi
   appendEvent(room, 'room_closed', by, { reason })
   await kv.del(roomKey(roomId))
   await kv.del(spectatorKey(roomId))
+  await clearRoomSessions(room)
   const list = emitList('deleted', room)
   const detail = emitDetail(roomId, { type: 'closed', room })
   await broadcastToDurable({ roomId, list, detail })
@@ -309,6 +328,7 @@ async function abortRoom(room: Room, by?: string, reason: 'timeout' | 'abandoned
   }
   appendEvent(room, 'game_aborted', by, { reason })
   await persistRoom(room, 'updated')
+  await clearRoomSessions(room)
   await persistFinishedGame(room)
   return room
 }
@@ -369,6 +389,7 @@ export async function createRoom(
 
   addPlayer(room, agent)
   await persistRoom(room, 'created')
+  await setSessionRoom(agent.sessionId, room.id)
   return room
 }
 
@@ -419,13 +440,15 @@ export async function requireRoom(roomId: string): Promise<Room> {
 }
 
 export async function findActiveRoomForSession(sessionId: string): Promise<Room | null> {
-  const keys = await kv.keys(ROOM_KEY_PREFIX)
-  const storedRooms = await Promise.all(keys.map(key => kv.get<Room>(key)))
-  return storedRooms.find((room): room is Room => (
-    room !== null
-    && !isTerminalStatus(room.status)
-    && room.players.some(player => player.sessionId === sessionId)
-  )) ?? null
+  const roomId = await kv.get<string>(sessionKey(sessionId))
+  if (!roomId)
+    return null
+  const room = await getRoom(roomId)
+  if (!room || isTerminalStatus(room.status) || !room.players.some(player => player.sessionId === sessionId)) {
+    await kv.del(sessionKey(sessionId))
+    return null
+  }
+  return room
 }
 
 export async function requireActiveRoomForSession(sessionId: string): Promise<Room> {
@@ -444,8 +467,10 @@ export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Ro
 
   if (room.status !== 'waiting')
     throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}; it is no longer accepting players` })
-  if (room.players.some(player => player.sessionId === agent.sessionId))
+  if (room.players.some(player => player.sessionId === agent.sessionId)) {
+    await setSessionRoom(agent.sessionId, room.id)
     return room
+  }
   if (room.players.length >= room.maxPlayers)
     throw createError({ statusCode: 409, statusMessage: 'Room is full' })
 
@@ -456,6 +481,7 @@ export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Ro
   else
     await persistRoom(room, 'updated')
 
+  await setSessionRoom(agent.sessionId, room.id)
   return room
 }
 
@@ -471,6 +497,8 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
 
   const [leaver] = room.players.splice(index, 1)
   appendEvent(room, 'player_left', leaver?.nickname)
+  if (leaver)
+    await clearSessionRoom(leaver.sessionId)
 
   if (room.hostSessionId === leaver?.sessionId && room.players[0])
     room.hostSessionId = room.players[0].sessionId
@@ -558,6 +586,7 @@ export async function finishGame(roomId: string, winner?: string, existingRoom?:
     reason: room.game?.finishReason,
   })
   await persistRoom(room, 'updated')
+  await clearRoomSessions(room)
   await persistFinishedGame(room)
 }
 

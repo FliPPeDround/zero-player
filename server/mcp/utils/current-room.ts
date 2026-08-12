@@ -2,7 +2,27 @@ import type { Room } from '#shared/rooms'
 import type { RoomDetailMessage } from '../../utils/room-store'
 import { findActiveRoomForSession, onRoomDetail } from '../../utils/room-store'
 
-const ROOM_POLL_INTERVAL_MS = 1000
+/**
+ * Adaptive REST poll fallback: fast at first, then backs off so long waits
+ * stay cheap while turns are still detected quickly.
+ */
+const POLL_INITIAL_INTERVAL_MS = 1000
+const POLL_FAST_WINDOW_MS = 10_000
+const POLL_MEDIUM_INTERVAL_MS = 2000
+const POLL_MEDIUM_WINDOW_MS = 30_000
+const POLL_SLOW_INTERVAL_MS = 3000
+const POLL_SLOW_WINDOW_MS = 60_000
+const POLL_MAX_INTERVAL_MS = 5000
+
+function pollDelayMs(elapsedMs: number): number {
+  if (elapsedMs < POLL_FAST_WINDOW_MS)
+    return POLL_INITIAL_INTERVAL_MS
+  if (elapsedMs < POLL_MEDIUM_WINDOW_MS)
+    return POLL_MEDIUM_INTERVAL_MS
+  if (elapsedMs < POLL_SLOW_WINDOW_MS)
+    return POLL_SLOW_INTERVAL_MS
+  return POLL_MAX_INTERVAL_MS
+}
 
 /**
  * MCP-side session resolver. REST stays decoupled from session membership:
@@ -61,7 +81,8 @@ export function createRoomWaiter(
   let outcome: RoomWaitOutcome | undefined
   let resolveWait: ((value: RoomWaitOutcome) => void) | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
-  let pollTimer: ReturnType<typeof setInterval> | undefined
+  let pollTimer: ReturnType<typeof setTimeout> | undefined
+  let startedAt = 0
   let polling = false
   let notFoundStreak = 0
   let waitPromise: Promise<RoomWaitOutcome> | undefined
@@ -76,7 +97,7 @@ export function createRoomWaiter(
       timer = undefined
     }
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = undefined
     }
     unsubscribe()
@@ -115,6 +136,19 @@ export function createRoomWaiter(
     }
   }
 
+  const scheduleNextPoll = (): void => {
+    if (outcome)
+      return
+    const delayMs = pollDelayMs(Date.now() - startedAt)
+    pollTimer = setTimeout(() => {
+      void checkRoom()
+        .catch((error) => {
+          console.error('[rooms] waiter poll failed:', error)
+        })
+        .finally(scheduleNextPoll)
+    }, delayMs)
+  }
+
   unsubscribe = subscribeToRoom(roomId, (message) => {
     if (message.type === 'error' || !('room' in message))
       return
@@ -126,9 +160,8 @@ export function createRoomWaiter(
   timer = setTimeout(() => {
     settle({ room: latest, timedOut: true, closed: false })
   }, timeoutMs)
-  pollTimer = setInterval(() => {
-    void checkRoom()
-  }, ROOM_POLL_INTERVAL_MS)
+  startedAt = Date.now()
+  scheduleNextPoll()
 
   return {
     wait(): Promise<RoomWaitOutcome> {

@@ -92,7 +92,7 @@ export default defineNuxtConfig({
       },
     },
     scheduledTasks: {
-      '*/1 * * * *': ['rooms:cleanup'],
+      '*/5 * * * *': ['rooms:cleanup'],
     },
     esbuild: {
       options: {
