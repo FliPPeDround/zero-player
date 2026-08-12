@@ -105,7 +105,8 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
         const message = JSON.parse(await parseSocketData(event.data)) as RoomDetailSocketMessage
         if (message.type === 'error') {
           error.value = message.message
-          close()
+          if (message.code === 'room_not_found')
+            close()
           return
         }
         if (message.type === 'closed') {

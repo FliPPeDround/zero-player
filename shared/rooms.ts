@@ -77,7 +77,7 @@ export type RoomListSocketMessage
     | { type: 'deleted', room: RoomSummary }
 
 export type RoomDetailSocketMessage
-  = { type: 'error', message: string }
+  = { type: 'error', code: 'room_not_found', message: string }
     | { type: 'snapshot' | 'update', room: Room }
     | { type: 'closed', room: Room }
     | { type: 'event', room: Room, event: RoomEvent }

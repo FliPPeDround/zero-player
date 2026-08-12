@@ -64,14 +64,14 @@ export default defineWebSocketHandler({
   async open(peer) {
     const roomId = roomIdFromUrl(peer.request.url)
     if (!roomId) {
-      safeSend(peer, { type: 'error', message: 'Room not found' })
+      safeSend(peer, { type: 'error', code: 'room_not_found', message: 'Room not found' })
       peer.close()
       return
     }
     const cached = getLatestRoomSnapshot(roomId)
     const stored = await getRoom(roomId)
     if (!cached && !stored) {
-      safeSend(peer, { type: 'error', message: 'Room not found' })
+      safeSend(peer, { type: 'error', code: 'room_not_found', message: 'Room not found' })
       peer.close()
       return
     }
