@@ -5,6 +5,16 @@ import type {
   RoomSummary,
 } from '#shared/rooms'
 
+/**
+ * Bounded reconnect with exponential backoff. A room page whose room no
+ * longer exists would otherwise reconnect forever, burning one request every
+ * few seconds per stale tab.
+ */
+export const wsAutoReconnect = {
+  retries: 6,
+  delay: (retried: number) => Math.min(1000 * 2 ** (retried - 1), 15_000),
+}
+
 function parseSocketData(data: unknown): Promise<string> {
   if (typeof data === 'string')
     return Promise.resolve(data)
@@ -21,7 +31,7 @@ export async function useRoomListFeed() {
 
   const { open, close } = useWebSocket('/ws/rooms', {
     immediate: false,
-    autoReconnect: true,
+    autoReconnect: wsAutoReconnect,
     onConnected: () => {
       connected.value = true
     },
@@ -84,7 +94,7 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
     computed(() => `/ws/rooms/${encodeURIComponent(id.value)}`),
     {
       immediate: false,
-      autoReconnect: true,
+      autoReconnect: wsAutoReconnect,
       onConnected: () => {
         connected.value = true
       },
@@ -95,6 +105,7 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
         const message = JSON.parse(await parseSocketData(event.data)) as RoomDetailSocketMessage
         if (message.type === 'error') {
           error.value = message.message
+          close()
           return
         }
         if (message.type === 'closed') {

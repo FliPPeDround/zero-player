@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { wsAutoReconnect } from '~/composables/rooms'
+
 const { rooms, loaded, connected, open, close } = await useRoomListFeed()
 
 const visitors = ref(0)
 const { open: openVisitors } = useWebSocket('/ws/visitors', {
   immediate: false,
-  autoReconnect: true,
+  autoReconnect: wsAutoReconnect,
   onMessage: async (ws, event) => {
     const text = typeof event.data === 'string' ? event.data : await event.data.text()
     visitors.value = Number.parseInt(text) || 0
