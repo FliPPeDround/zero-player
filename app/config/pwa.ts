@@ -36,8 +36,11 @@ export const pwa: ModuleOptions = {
   },
   workbox: {
     globPatterns: ['**/*.{js,css,html,txt,png,ico,svg}'],
-    navigateFallbackDenylist: [/^\/api\//],
-    navigateFallback: '/',
+    // This is a server-rendered Nuxt app, so navigations must reach the
+    // network: a `navigateFallback: '/'` would serve the cached lobby HTML
+    // for every deep link (e.g. `/rooms/:id`) and look like a homepage redirect.
+    // `null` overrides the module's default fallback.
+    navigateFallback: null,
     cleanupOutdatedCaches: true,
     runtimeCaching: [
       {
@@ -74,6 +77,8 @@ export const pwa: ModuleOptions = {
   writePlugin: true,
   devOptions: {
     enabled: process.env.VITE_PLUGIN_PWA === 'true',
-    navigateFallback: scope,
+    // In dev the module replaces `navigateFallback: null` with `scope`, so pin
+    // an empty allowlist to keep the fallback route from matching any deep link.
+    navigateFallbackAllowlist: [],
   },
 }

@@ -292,8 +292,13 @@ useHead({
                         class="shrink-0"
                       />
                     </div>
-                    <div class="text-mini color-muted leading-tight font-mono truncate">
-                      {{ firstPlayer ? `${firstPlayer.model} · ${firstPlayer.harness}` : 'Waiting' }}
+                    <PlayerIdentity
+                      v-if="firstPlayer"
+                      :model="firstPlayer.model"
+                      :harness="firstPlayer.harness"
+                    />
+                    <div v-else class="text-mini color-muted leading-tight font-mono truncate">
+                      Waiting
                     </div>
                   </div>
                 </div>
@@ -332,8 +337,13 @@ useHead({
                         class="shrink-0"
                       />
                     </div>
-                    <div class="text-mini color-muted leading-tight font-mono truncate">
-                      {{ secondPlayer ? `${secondPlayer.model} · ${secondPlayer.harness}` : 'Waiting' }}
+                    <PlayerIdentity
+                      v-if="secondPlayer"
+                      :model="secondPlayer.model"
+                      :harness="secondPlayer.harness"
+                    />
+                    <div v-else class="text-mini color-muted leading-tight font-mono truncate">
+                      Waiting
                     </div>
                   </div>
                   <DisplayAvatar

@@ -6,6 +6,19 @@ const colorMode = useColorMode()
 
 provideColorScheme(() => colorMode.value === 'dark' ? 'dark' : 'light')
 
+onMounted(() => {
+  // A stale PWA service worker (with `navigateFallback: '/'`) can intercept
+  // deep links like `/rooms/:id` and serve the lobby HTML instead. Normal dev
+  // runs without the PWA plugin, so unregister any leftover worker so the
+  // address bar always hits the real server.
+  if (import.meta.dev && !import.meta.env.VITE_PLUGIN_PWA && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations)
+        registration.unregister()
+    })
+  }
+})
+
 useHead({
   title: appName,
 })

@@ -3,7 +3,6 @@ import type { RoomPlayer } from '#shared/rooms'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
-import OverlayTooltip from '@antfu/design/components/Overlay/OverlayTooltip.vue'
 
 defineProps<{
   player: RoomPlayer | null
@@ -30,11 +29,11 @@ defineProps<{
           />
           <DisplayBadge v-if="highlight" text="Winner" color="success" rounded="full" />
         </div>
-        <OverlayTooltip :content="`Session ${player.sessionId}`" placement="bottom">
-          <span class="text-xs color-muted font-mono truncate">
-            {{ player.model }} · {{ player.harness }}
-          </span>
-        </OverlayTooltip>
+        <PlayerIdentity
+          :model="player.model"
+          :harness="player.harness"
+          :hint="`Session ${player.sessionId}`"
+        />
       </div>
     </template>
     <template v-else>
