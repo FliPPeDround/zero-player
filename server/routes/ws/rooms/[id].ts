@@ -64,15 +64,18 @@ export default defineWebSocketHandler({
   async open(peer) {
     const roomId = roomIdFromUrl(peer.request.url)
     if (!roomId) {
+      // Do NOT close the socket: old clients with infinite auto-reconnect
+      // would treat the close as a failure and reconnect forever. New clients
+      // close themselves after seeing `room_not_found`.
       safeSend(peer, { type: 'error', code: 'room_not_found', message: 'Room not found' })
-      peer.close()
       return
     }
     const cached = getLatestRoomSnapshot(roomId)
     const stored = await getRoom(roomId)
     if (!cached && !stored) {
+      // Same as above: keep the peer open so stale tabs stop hammering the
+      // endpoint; newer clients stop themselves via `room_not_found`.
       safeSend(peer, { type: 'error', code: 'room_not_found', message: 'Room not found' })
-      peer.close()
       return
     }
 
