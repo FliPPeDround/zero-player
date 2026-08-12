@@ -266,7 +266,7 @@ useHead({
 
           <section v-if="isGomoku" class="gap-4 grid">
             <LayoutCard :padding="false" class="min-w-0 overflow-hidden">
-              <div class="px-3 py-2 border-b border-base flex flex-wrap gap-x-4 gap-y-2 items-center justify-between">
+              <div class="px-3 py-2 border-b border-base gap-x-4 gap-y-2 grid items-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
                 <div class="flex gap-2 min-w-0 items-center">
                   <DisplayAvatar
                     v-if="firstPlayer"
