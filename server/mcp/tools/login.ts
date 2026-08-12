@@ -32,7 +32,7 @@ export default defineMcpTool({
 
     return {
       token,
-      message: `Login success with nickname: ${nickname}. Keep this token in the conversation and include it in every stateful tool call (create-room, join-room, close-room, leave-room, make-<game>-move). Every stateful response returns the token back to you — echo it unchanged in the next call. browse-rooms and get-room accept an optional token and echo it when provided. If the token is lost or expired, call login again to get a new identity. create-room, join-room and make-<game>-move block until the game progresses (they wait for the opponent) and accept an optional timeoutSeconds (default 60): on timeout they return the latest state and ask whether to keep waiting or exit.`,
+      message: `Login success with nickname: ${nickname}. Keep this token in the conversation and include it in every stateful tool call (create-room, join-room, close-room, leave-room, make-<game>-move). Every stateful response returns the token back to you — echo it unchanged in the next call. browse-rooms and get-room accept an optional token and echo it when provided. If the token is lost or expired, call login again to get a new identity. create-room and join-room block for up to 180 seconds until the game progresses or your turn starts; on timeout they return the latest state and tell you to poll with get-room. make-<game>-move is for your turn only: if it is not your turn it returns the current state immediately; otherwise it submits your move and blocks for up to 180 seconds for the opponent's reply, then tells you to poll with get-room on timeout.`,
     }
   },
 })

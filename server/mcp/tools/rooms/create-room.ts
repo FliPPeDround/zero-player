@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createRoomWaiter, describeRoomOutcome } from '../../utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
 import { toMcpRoomResult } from '../../utils/room-view'
-import { DEFAULT_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../../utils/wait-message'
+import { BLOCKING_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../../utils/wait-message'
 
 function createdMessage(room: Room, userId: string): string {
   if (room.status === 'playing') {
@@ -17,7 +17,7 @@ function createdMessage(room: Room, userId: string): string {
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Create a new room. The calling agent is added as the first player; the game starts automatically when the room is full. The call blocks until another player joins and the game starts (or the match ends), then returns the latest room state. On timeout it returns the current room state with a message asking whether to keep waiting or exit.',
+  description: 'Create a new room. The calling agent is added as the first player; the game starts automatically when the room is full. The call blocks for up to 180 seconds until another player joins and the game starts (or the match ends), then returns the latest room state. On timeout it returns the current room state with instructions to poll with get-room and act once the state changes.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -28,17 +28,16 @@ export default defineMcpTool({
     name: z.string().trim().min(1).max(60).optional().describe('Human-friendly room name, defaults to "<nickname>\'s room"'),
     game: z.enum(GAME_IDS).describe('Game to play; choose from the known platform catalog'),
     token: z.string().optional().describe('Your login token from login; required for every stateful call'),
-    timeoutSeconds: z.number().int().min(5).max(300).optional().describe('How long to wait for another player to join before returning (default 60)'),
   },
   inputExamples: [
     { game: 'gomoku', token: '<token from login>' },
     { game: 'gomoku', name: 'Friday Night Brawl', token: '<token from login>' },
   ],
-  handler: async ({ name, game, token, timeoutSeconds }) => {
+  handler: async ({ name, game, token }) => {
     const agent = await requireAgentFromToken(token)
     const userId = agent.sessionId
     const tokenValue = String(token)
-    const timeoutMs = (timeoutSeconds ?? DEFAULT_WAIT_TIMEOUT_SECONDS) * 1000
+    const timeoutMs = BLOCKING_WAIT_TIMEOUT_SECONDS * 1000
     const echo = (result: Record<string, unknown>) => withTokenEcho(result, tokenValue)
 
     const room = await $fetch('/api/rooms', {
@@ -67,10 +66,9 @@ export default defineMcpTool({
       if (outcome.timedOut) {
         return echo({
           message: waitTimeoutMessage({
-            waitedSeconds: timeoutSeconds ?? DEFAULT_WAIT_TIMEOUT_SECONDS,
+            waitedSeconds: BLOCKING_WAIT_TIMEOUT_SECONDS,
             waitedFor: 'another player to join',
-            continueHint: `call make-${game}-move to keep waiting for the game to start`,
-            exitHint: 'call leave-room to give up your seat',
+            continueHint: `Poll with get-room (roomId: ${finalRoom.id}) until the game starts; when it is your turn, call make-${game}-move. Do not create another room or leave unless you intend to give up.`,
           }),
           ...toMcpRoomResult(finalRoom),
         })

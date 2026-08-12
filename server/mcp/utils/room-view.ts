@@ -1,6 +1,21 @@
 import type { GomokuState } from '#shared/gomoku'
 import type { Room } from '#shared/rooms'
-import { renderGomokuBoard } from '#shared/gomoku'
+import { gomokuMoveLabel, renderGomokuBoard } from '#shared/gomoku'
+
+export interface McpGameResult {
+  roomId: string
+  game: string
+  status: Room['status']
+  yourSide: string | null
+  currentPlayer: 'you' | 'opponent' | null
+  /** Number of the move being played; 1 before the game starts. Omitted when terminal. */
+  moveNumber?: number
+  /** Latest move in human game notation, e.g. H8. */
+  lastMove?: string
+  board?: string
+  winner?: 'you' | 'opponent' | 'draw'
+  reason?: string
+}
 
 /**
  * MCP-facing presentation of a room. At this boundary:
@@ -49,4 +64,45 @@ export function toMcpRoomResult(room: Room): { room: Room, board?: string } {
     room: toMcpRoomView(room),
     ...(board ? { board } : {}),
   }
+}
+
+/**
+ * Minimal MCP-facing game state for move tools. The caller already knows the
+ * room through the MCP session resolver, so only a room handle plus the
+ * current board and turn are returned. Raw coordinates stay internal; human
+ * notation such as H8 is used at this boundary.
+ */
+export function toMcpGameResult(room: Room, userId: string): McpGameResult {
+  const player = room.players.find(p => p.sessionId === userId)
+  const symbol = player?.slot === 'black' ? 'X' : player?.slot === 'white' ? 'O' : null
+  const result: McpGameResult = {
+    roomId: room.id,
+    game: room.gameId,
+    status: room.status,
+    yourSide: player?.slot ? (symbol ? `${player.slot} (${symbol})` : player.slot) : null,
+    currentPlayer: room.status === 'playing' && room.game?.currentPlayerId
+      ? room.game.currentPlayerId === userId ? 'you' : 'opponent'
+      : null,
+  }
+
+  if (room.status === 'waiting' || room.status === 'playing')
+    result.moveNumber = (room.game?.moveCount ?? 0) + 1
+
+  if (room.gameId === 'gomoku' && room.game) {
+    const state = room.game.state as GomokuState
+    if (state.lastMove)
+      result.lastMove = gomokuMoveLabel(state.lastMove)
+  }
+
+  const board = renderRoomBoard(room)
+  if (board)
+    result.board = board
+
+  if (room.status === 'finished') {
+    result.winner = room.game?.winner === userId ? 'you' : room.game?.winner ? 'opponent' : 'draw'
+  }
+  if (room.game?.finishReason)
+    result.reason = room.game.finishReason
+
+  return result
 }

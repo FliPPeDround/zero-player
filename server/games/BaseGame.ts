@@ -11,8 +11,8 @@ import type { Room } from '#shared/rooms'
 import { defineMcpTool } from '@nuxtjs/mcp-toolkit/server'
 import { z } from 'zod'
 import { requireAgentFromToken, withTokenEcho } from '../mcp/utils/identity'
-import { toMcpRoomResult } from '../mcp/utils/room-view'
-import { DEFAULT_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../mcp/utils/wait-message'
+import { toMcpGameResult } from '../mcp/utils/room-view'
+import { BLOCKING_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../mcp/utils/wait-message'
 
 export const GAME_SCHEMA_VERSION = 1
 
@@ -96,11 +96,10 @@ export abstract class BaseGame<
     return defineMcpTool({
       name: definition.toolName,
       group: 'games',
-      description: `${definition.description} The call blocks until it is your turn (waiting for the game to start if needed), submits your move, then blocks again until the opponent has moved or the match ends — the returned room always contains the opponent's latest move, and the current board is included as an ASCII diagram in the board field. On timeout it returns the latest state with a message asking whether to keep waiting or exit.`,
+      description: `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state immediately instead of blocking. It submits your move, then blocks for up to 180 seconds until the opponent replies or the match ends — the current board is included as an ASCII diagram in the board field. On timeout it returns the latest state with instructions to poll with get-room and call this tool again once it is your turn.`,
       inputSchema: {
         ...definition.inputSchema,
         token: z.string().optional().describe('Your login token from login; required for every stateful call'),
-        timeoutSeconds: z.number().int().min(5).max(300).optional().describe('How long to wait for the opponent before returning (default 60)'),
       },
       inputExamples: definition.inputExamples,
       annotations: {
@@ -111,13 +110,11 @@ export abstract class BaseGame<
       },
       handler: async (args) => {
         const rawToken = (args as Record<string, unknown>).token
-        const timeoutSeconds = (args as Record<string, unknown>).timeoutSeconds
         const agent = await requireAgentFromToken(rawToken)
         const token = String(rawToken)
         const userId = agent.sessionId
-        const timeoutMs = (typeof timeoutSeconds === 'number' ? timeoutSeconds : DEFAULT_WAIT_TIMEOUT_SECONDS) * 1000
-        const waitedSeconds = typeof timeoutSeconds === 'number' ? timeoutSeconds : DEFAULT_WAIT_TIMEOUT_SECONDS
-        const present = (room: Room) => toMcpRoomResult(room)
+        const timeoutMs = BLOCKING_WAIT_TIMEOUT_SECONDS * 1000
+        const present = (room: Room) => toMcpGameResult(room, userId)
         const echo = (result: Record<string, unknown>) => withTokenEcho(result, token)
 
         const headers = { authorization: `Bearer ${token}` }
@@ -128,53 +125,35 @@ export abstract class BaseGame<
         const isMyTurn = (candidate: Room) => candidate.status === 'playing' && candidate.game?.currentPlayerId === userId
         const isDone = (candidate: Room) => isTerminal(candidate) || isMyTurn(candidate)
 
+        const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
+
+        if (room.gameId !== definition.gameId) {
+          throw createError({
+            statusCode: 409,
+            statusMessage: `You are in a ${room.gameId} room; use make-${room.gameId}-move instead`,
+          })
+        }
+
+        if (isTerminal(room)) {
+          return echo({
+            message: `${describeRoomOutcome(room, userId)}; no move submitted.`,
+            ...present(room),
+          })
+        }
+
+        if (!isMyTurn(room)) {
+          return echo({
+            message: `It is not your turn yet. Use get-room (roomId: ${room.id}) to check the latest state; call ${definition.toolName} when it is your turn.`,
+            ...present(room),
+          })
+        }
+
         const action = definition.toAction(args as Record<string, unknown>)
 
-        // Subscribe before any REST read so no room update can slip between
-        // the round trips and the listener.
-        let waiter = createRoomWaiter(roomId, isDone, timeoutMs)
+        // It is our turn: subscribe for the reply before posting so the
+        // terminal event of a winning move is never missed.
+        const waiter = createRoomWaiter(roomId, isDone, timeoutMs)
         try {
-          const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
-
-          if (room.gameId !== definition.gameId) {
-            throw createError({
-              statusCode: 409,
-              statusMessage: `You are in a ${room.gameId} room; use make-${room.gameId}-move instead`,
-            })
-          }
-
-          if (isTerminal(room)) {
-            waiter.cancel()
-            return echo({
-              message: `${describeRoomOutcome(room, userId)}; no move submitted.`,
-              ...present(room),
-            })
-          }
-
-          if (!isMyTurn(room)) {
-            const outcome = await waiter.wait()
-            const latest = outcome.room ?? room
-            if (outcome.closed)
-              return echo({ message: 'Room was closed.', ...present(latest) })
-            if (outcome.timedOut) {
-              return echo({
-                message: waitTimeoutMessage({
-                  waitedSeconds,
-                  waitedFor: 'the opponent to join or move',
-                  continueHint: `call ${definition.toolName} again to keep waiting`,
-                  exitHint: 'call leave-room to leave the room (gives up a waiting seat, aborts a running match)',
-                }),
-                ...present(latest),
-              })
-            }
-            if (isTerminal(latest))
-              return echo({ message: `${describeRoomOutcome(latest, userId)}; no move submitted.`, ...present(latest) })
-          }
-
-          // It is our turn: commit the move. Subscribe for the reply before
-          // posting so the terminal event of a winning move is never missed.
-          waiter.cancel()
-          waiter = createRoomWaiter(roomId, isDone, timeoutMs)
           const updatedRoom = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/moves`, {
             method: 'POST',
             headers,
@@ -182,7 +161,6 @@ export abstract class BaseGame<
           })
 
           if (isTerminal(updatedRoom) || isMyTurn(updatedRoom)) {
-            waiter.cancel()
             return echo({
               message: isTerminal(updatedRoom)
                 ? `${definition.describeAction(args as Record<string, unknown>)}. ${describeRoomOutcome(updatedRoom, userId)}.`
@@ -198,10 +176,9 @@ export abstract class BaseGame<
           if (outcome.timedOut) {
             return echo({
               message: `${definition.describeAction(args as Record<string, unknown>)}. ${waitTimeoutMessage({
-                waitedSeconds,
+                waitedSeconds: BLOCKING_WAIT_TIMEOUT_SECONDS,
                 waitedFor: 'the opponent\'s reply',
-                continueHint: `call ${definition.toolName} again to keep waiting`,
-                exitHint: 'call close-room to abort the game as host',
+                continueHint: `The opponent may still be thinking. Poll with get-room (roomId: ${finalRoom.id}) to check the latest state; when it is your turn, call ${definition.toolName} again. Do not resubmit your move or leave the room.`,
               })}`,
               ...present(finalRoom),
             })
