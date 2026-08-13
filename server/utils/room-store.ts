@@ -16,11 +16,8 @@ import { toRoomSummary } from '#shared/rooms'
 import { createGameInstance } from '../games/registry'
 import { persistFinishedGame } from './game-dataset'
 
-export type RoomListMessage = RoomListSocketMessage
-export type RoomDetailMessage = RoomDetailSocketMessage
-
-type ListListener = (message: RoomListMessage) => void
-type DetailListener = (message: RoomDetailMessage) => void
+type ListListener = (message: RoomListSocketMessage) => void
+type DetailListener = (message: RoomDetailSocketMessage) => void
 
 const ROOM_KEY_PREFIX = 'rooms:'
 const SESSION_KEY_PREFIX = 'session:'
@@ -45,7 +42,7 @@ let eventCounter = 0
 export interface RoomHubBroadcast {
   roomId: string
   list: RoomUpdateListMessage
-  detail: RoomDetailMessage
+  detail: RoomDetailSocketMessage
 }
 
 export type RoomUpdateListMessage
@@ -134,7 +131,7 @@ function updateRoomListCache(type: 'created' | 'updated' | 'deleted', room: Room
   roomListCache.rooms.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
-function emitDetail(roomId: string, message: RoomDetailMessage): RoomDetailMessage {
+function emitDetail(roomId: string, message: RoomDetailSocketMessage): RoomDetailSocketMessage {
   const listeners = detailListeners.get(roomId)
   if (!listeners)
     return message
@@ -145,30 +142,37 @@ function emitDetail(roomId: string, message: RoomDetailMessage): RoomDetailMessa
 
 /**
  * Resolve the Nitro WebSocket Durable Object stub when running in a regular
- * Cloudflare Worker. WebSocket handlers live in `$DurableObject`, so room
- * updates produced by REST/scheduled work must be forwarded there to reach
- * browser peers. Inside the Durable Object itself we skip the forward and
- * emit locally instead.
+ * Cloudflare Worker. WebSocket peers live in `$DurableObject`; room mutations
+ * are forwarded into it (see `server/utils/room-durable.ts`) so the mutation
+ * and the broadcast happen in the same isolate. Inside the Durable Object
+ * itself the stub resolves to null and everything emits locally.
  */
-function getDurableObjectStub(): DurableObjectStub | null {
+export function getDurableObjectStub(): DurableObjectStub | null {
   const g = globalThis as DurableGlobal
+  let env: Record<string, unknown> | undefined
   try {
     const event = useEvent()
     const platform = event.context._platform?.cloudflare as {
       durableFetch?: (request: Request) => Promise<Response>
       durable?: unknown
+      env?: Record<string, unknown>
     } | undefined
+    // Inside the Nitro WebSocket Durable Object itself the peers are local,
+    // so broadcasts are emitted in place and must not be re-forwarded.
     if (platform?.durable !== undefined)
       return null
     const durableFetch = platform?.durableFetch
     if (typeof durableFetch === 'function')
       return { fetch: request => durableFetch(request) }
+    // Canonical binding access: works even when the `_platform` plumbing is
+    // missing or the async context was lost after an await.
+    env = platform?.env ?? (event.context.cloudflare as { env?: Record<string, unknown> } | undefined)?.env
   }
   catch {
-    // Not inside a Nitro request (e.g. a scheduled task): fall back to the
-    // Durable Object binding directly.
+    // Not inside a Nitro request (e.g. a scheduled task): Nitro keeps the
+    // Cloudflare env on `globalThis.__env__`; fall back to the binding there.
   }
-  const binding = g.__env__?.[DURABLE_BINDING_NAME] as DurableObjectBinding | undefined
+  const binding = (env ?? g.__env__)?.[DURABLE_BINDING_NAME] as DurableObjectBinding | undefined
   if (!binding)
     return null
   try {
@@ -192,8 +196,9 @@ async function broadcastToDurable(payload: RoomHubBroadcast): Promise<void> {
   }
   catch (error) {
     // The room is already persisted and emitted locally; a failed WS bridge
-    // must not fail the request. Peers will catch up on their next snapshot.
-    console.error('[rooms] failed to broadcast to WebSocket durable object:', error)
+    // must not fail the request. The Durable Object-side KV poller (see
+    // server/routes/ws/rooms/[id].ts) catches peers up within ~2s.
+    console.error(`[rooms] failed to broadcast room ${payload.roomId} to the WebSocket durable object:`, error)
   }
 }
 
@@ -259,10 +264,10 @@ function computeClosesAt(room: Room): string | undefined {
       return new Date(room.updatedAt).getTime() + WAITING_IDLE_MS
     if (room.status === 'playing')
       return new Date(room.updatedAt).getTime() + STALL_TIMEOUT_MS
-    if (room.status === 'finished' && room.finishedAt)
-      return new Date(room.finishedAt).getTime() + TERMINAL_RETENTION_MS
-    if (room.status === 'aborted' && room.abortedAt)
-      return new Date(room.abortedAt).getTime() + TERMINAL_RETENTION_MS
+    if (room.status === 'finished')
+      return new Date(room.finishedAt ?? room.updatedAt).getTime() + TERMINAL_RETENTION_MS
+    if (room.status === 'aborted')
+      return new Date(room.abortedAt ?? room.updatedAt).getTime() + TERMINAL_RETENTION_MS
     return undefined
   })()
   return deadlineMs === undefined ? undefined : new Date(deadlineMs).toISOString()
@@ -590,14 +595,6 @@ export async function setSpectatorCount(roomId: string, count: number): Promise<
   emitList('updated', room)
 }
 
-export async function emitGameMove(roomId: string, actor: string, payload: Record<string, unknown>): Promise<void> {
-  const room = await getRoom(roomId)
-  if (!room || room.status !== 'playing')
-    return
-  appendEvent(room, 'move', actor, payload)
-  await persistRoom(room, 'updated')
-}
-
 /**
  * Authoritative entry point for gameplay. Any player (agent via MCP/API,
  * future human input) submits an action through here; the game engine
@@ -615,6 +612,9 @@ export function submitGameMove(
     if (room.status !== 'playing')
       throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}` })
 
+    if (!room.players.some(player => player.sessionId === playerId))
+      throw createError({ statusCode: 403, statusMessage: 'You are not a player in this room' })
+
     const game = createGameInstance(room)
     const outcome = game.play(playerId, action)
     if (!outcome.ok)
@@ -629,10 +629,8 @@ export function submitGameMove(
     })
     await persistRoom(room, 'updated')
 
-    if (game.status === 'finished') {
-      const winnerNickname = room.players.find(player => player.sessionId === game.winner)?.nickname
-      await finishGame(roomId, winnerNickname ?? game.winner, room)
-    }
+    if (game.status === 'finished')
+      await finishGame(roomId, game.winner, room)
 
     return room
   })
@@ -640,10 +638,10 @@ export function submitGameMove(
 
 /**
  * Race games (e.g. 24 Point) let both players submit at the same time. The
- * KV room state is read-modify-write, so serialize submissions per room
- * in-process to prevent two concurrent requests from clobbering each other.
- * Across Worker isolates the first persisted write still wins; the loser sees
- * the terminal room on its next get-room/move call.
+ * KV room state is read-modify-write, so submissions are serialized per
+ * room. On Cloudflare every room mutation runs inside the single WebSocket
+ * Durable Object (see server/utils/room-durable.ts), so this in-process
+ * queue is the only writer ordering the store needs.
  */
 function withRoomMoveSerialization<T>(roomId: string, task: () => Promise<T>): Promise<T> {
   const previous = gameMoveQueues.get(roomId) ?? Promise.resolve()

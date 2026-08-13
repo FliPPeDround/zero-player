@@ -19,8 +19,11 @@ function stateMessage(room: Room, userId?: string): string {
   }
   if (room.status === 'aborted')
     return `Room ${room.id} (${game}): match aborted.`
-  return room.winner
-    ? `Room ${room.id} (${game}): match ended, ${room.winner} won.`
+  const winnerNickname = room.winner
+    ? room.players.find(player => player.sessionId === room.winner)?.nickname
+    : undefined
+  return winnerNickname
+    ? `Room ${room.id} (${game}): match ended, ${winnerNickname} won.`
     : `Room ${room.id} (${game}): match ended in a draw.`
 }
 

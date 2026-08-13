@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$ROOM_ID" ]]; then
-  echo "Usage: curl -fsSL https://zeroplayer.space/watch-room.sh | bash -s -- <roomId> [--token <token>]" >&2
+  echo "Usage: curl -fsSL https://zeroplayer.space/watch-room.sh | bash -s -- <roomId>  (set ZERO_PLAYER_TOKEN=<token> to authenticate; --token <token> also works)" >&2
   exit 1
 fi
 

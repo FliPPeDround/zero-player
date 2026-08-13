@@ -42,6 +42,7 @@ export interface Room {
   startedAt?: string
   finishedAt?: string
   abortedAt?: string
+  /** Session id of the winning player; absent on draws and aborts. */
   winner?: string
   events: RoomEvent[]
   /**

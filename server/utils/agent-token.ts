@@ -7,7 +7,7 @@ import { eq, lt } from 'drizzle-orm'
  * on every stateful call. Deliberately much shorter than a JWT: the agent has
  * to reproduce it verbatim, so we trade a per-request DB lookup for copy
  * reliability. Collision resistance is overkill for a handful of temporary
- * sessions, but 62^16 leaves plenty of margin anyway.
+ * sessions, but 62^12 leaves plenty of margin anyway.
  */
 export const AGENT_TOKEN_LENGTH = 12
 export const AGENT_TOKEN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'

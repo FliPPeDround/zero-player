@@ -1,3 +1,4 @@
+import type { Room, RoomDetailSocketMessage } from '#shared/rooms'
 import type { Peer } from 'crossws'
 import { getLatestRoomSnapshot, getRoom, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
 
@@ -6,6 +7,82 @@ const unsubscribers = new Map<string, () => void>()
 const roomIdPattern = /^\/ws\/rooms\/([^/]+)$/
 const SPECTATOR_DEBOUNCE_MS = 5000
 const spectatorWrites = new Map<string, { count: number, lastWriteAt: number, timer?: ReturnType<typeof setTimeout> }>()
+
+/**
+ * The REST→Durable Object bridge (`broadcastToDurable` in room-store) delivers
+ * room updates instantly, but it depends on cross-isolate plumbing (main
+ * Worker → DO stub fetch) that can fail: stale deploys, transient DO errors,
+ * cold starts. As a safety net, every room with connected peers is also
+ * polled straight from KV on a short interval, so the board always catches up
+ * even when the bridge is down. Bridge pushes update the poll key so the
+ * fallback never replays a message it already delivered.
+ */
+const ROOM_POLL_INTERVAL_MS = 2000
+interface RoomPoller {
+  timer: ReturnType<typeof setInterval>
+  lastKey: string
+  lastRoom: Room
+}
+const pollers = new Map<string, RoomPoller>()
+
+function roomPollKey(room: Room): string {
+  return `${room.updatedAt}|${room.events.length}`
+}
+
+function stopRoomPoller(roomId: string): void {
+  const poller = pollers.get(roomId)
+  if (poller) {
+    clearInterval(poller.timer)
+    pollers.delete(roomId)
+  }
+}
+
+function syncPollerKey(roomId: string, room: Room): void {
+  const poller = pollers.get(roomId)
+  if (poller) {
+    poller.lastKey = roomPollKey(room)
+    poller.lastRoom = room
+  }
+}
+
+function ensureRoomPoller(roomId: string, initial: Room): void {
+  if (pollers.has(roomId))
+    return
+  const poller: RoomPoller = {
+    timer: setInterval(() => {
+      void pollRoom(roomId)
+    }, ROOM_POLL_INTERVAL_MS),
+    lastKey: roomPollKey(initial),
+    lastRoom: initial,
+  }
+  pollers.set(roomId, poller)
+}
+
+async function pollRoom(roomId: string): Promise<void> {
+  const poller = pollers.get(roomId)
+  const roomPeers = peersByRoom.get(roomId)
+  if (!poller || !roomPeers || roomPeers.size === 0) {
+    stopRoomPoller(roomId)
+    return
+  }
+  const room = await getRoom(roomId)
+  if (!room) {
+    // Room was deleted (KV TTL / sweep / host close): notify peers and stop.
+    const message: RoomDetailSocketMessage = { type: 'closed', room: poller.lastRoom }
+    for (const connected of roomPeers)
+      safeSend(connected, message)
+    stopRoomPoller(roomId)
+    return
+  }
+  const key = roomPollKey(room)
+  if (key !== poller.lastKey) {
+    poller.lastKey = key
+    poller.lastRoom = room
+    const message: RoomDetailSocketMessage = { type: 'update', room }
+    for (const connected of roomPeers)
+      safeSend(connected, message)
+  }
+}
 
 function safeSend(peer: Peer, payload: unknown): void {
   try {
@@ -88,6 +165,8 @@ export default defineWebSocketHandler({
       unsubscribers.set(
         roomId,
         onRoomDetail(roomId, (message) => {
+          if ('room' in message)
+            syncPollerKey(roomId, message.room)
           for (const connected of peersByRoom.get(roomId) ?? [])
             safeSend(connected, message)
         }),
@@ -97,7 +176,10 @@ export default defineWebSocketHandler({
     const snapshot = cached && stored && cached.events.length > stored.events.length
       ? cached
       : (stored ?? cached)
+    if (!snapshot)
+      return
     safeSend(peer, { type: 'snapshot', room: snapshot })
+    ensureRoomPoller(roomId, snapshot)
   },
   close(peer) {
     for (const [roomId, roomPeers] of peersByRoom) {
@@ -107,6 +189,7 @@ export default defineWebSocketHandler({
       void writeSpectatorCount(roomId, roomPeers.size)
       if (roomPeers.size === 0) {
         peersByRoom.delete(roomId)
+        stopRoomPoller(roomId)
         unsubscribers.get(roomId)?.()
         unsubscribers.delete(roomId)
       }

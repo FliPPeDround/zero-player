@@ -4,7 +4,7 @@ import { wsAutoReconnect } from '~/composables/rooms'
 const { rooms, loaded, connected, open, close } = await useRoomListFeed()
 
 const visitors = ref(0)
-const { open: openVisitors } = useWebSocket('/ws/visitors', {
+const { open: openVisitors, close: closeVisitors } = useWebSocket('/ws/visitors', {
   immediate: false,
   autoReconnect: wsAutoReconnect,
   onMessage: async (ws, event) => {
@@ -20,6 +20,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   close()
+  closeVisitors()
 })
 
 const waitingCount = computed(() => rooms.value.filter(room => room.status === 'waiting').length)

@@ -150,8 +150,16 @@ function moveAvatarClass(event: RoomEvent): string {
 }
 
 const winnerDotClass = computed(() => {
-  const winner = players.value.find(player => player.nickname === room.value?.winner)
+  const winner = players.value.find(player => player.sessionId === room.value?.winner)
   return gameSides.value.find(side => side.key === winner?.slot)?.dotClass ?? ''
+})
+
+/** `room.winner` is a session id; map it to the nickname for display. */
+const winnerNickname = computed(() => {
+  const winner = room.value?.winner
+  if (!winner)
+    return ''
+  return players.value.find(player => player.sessionId === winner)?.nickname ?? ''
 })
 
 const logRef = ref<HTMLElement | null>(null)
@@ -240,7 +248,7 @@ useHead({
               :player="firstPlayer"
               :label="firstSide?.label ?? 'First'"
               :color="firstSide?.color ?? false"
-              :highlight="room.status === 'finished' && firstPlayer?.nickname === room.winner"
+              :highlight="room.status === 'finished' && firstPlayer?.sessionId === room.winner"
             />
             <div class="text-sm color-faint font-mono flex items-center self-center justify-center">
               VS
@@ -249,7 +257,7 @@ useHead({
               :player="secondPlayer"
               :label="secondSide?.label ?? 'Second'"
               :color="secondSide?.color ?? false"
-              :highlight="room.status === 'finished' && secondPlayer?.nickname === room.winner"
+              :highlight="room.status === 'finished' && secondPlayer?.sessionId === room.winner"
             />
           </section>
           <section v-else-if="!isGomoku && !isTwentyFour" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
@@ -259,7 +267,7 @@ useHead({
               :player="player"
               :label="`Seat ${index + 1}`"
               :color="false"
-              :highlight="room.status === 'finished' && player.nickname === room.winner"
+              :highlight="room.status === 'finished' && player.sessionId === room.winner"
             />
             <RoomPlayerCard
               v-for="index in Math.max(0, room.maxPlayers - players.length)"
@@ -291,7 +299,7 @@ useHead({
                         {{ firstPlayer?.nickname ?? firstSide?.label ?? 'First' }}
                       </span>
                       <DisplayBadge
-                        v-if="firstPlayer && room.status === 'finished' && firstPlayer.nickname === room.winner"
+                        v-if="firstPlayer && room.status === 'finished' && firstPlayer.sessionId === room.winner"
                         text="Winner"
                         color="success"
                         rounded="full"
@@ -336,7 +344,7 @@ useHead({
                         {{ secondPlayer?.nickname ?? secondSide?.label ?? 'Second' }}
                       </span>
                       <DisplayBadge
-                        v-if="secondPlayer && room.status === 'finished' && secondPlayer.nickname === room.winner"
+                        v-if="secondPlayer && room.status === 'finished' && secondPlayer.sessionId === room.winner"
                         text="Winner"
                         color="success"
                         rounded="full"
@@ -400,7 +408,7 @@ useHead({
             <DisplayKeyValue label="Last activity">
               <DisplayDate :date="room.updatedAt" :live="room.status === 'playing'" />
             </DisplayKeyValue>
-            <DisplayKeyValue v-if="room.status === 'finished' && room.winner" label="Winner" :value="room.winner" />
+            <DisplayKeyValue v-if="room.status === 'finished' && room.winner" label="Winner" :value="winnerNickname" />
             <DisplayKeyValue
               v-if="closesInLabel"
               label="Auto-closes"
@@ -480,12 +488,6 @@ useHead({
                             · {{ event.payload.feedback }}
                           </template>
                         </div>
-                        <div
-                          v-if="event.payload.type !== 'place' && event.payload.type !== 'answer'"
-                          class="text-mini color-faint font-mono mt-0.5 tabular-nums"
-                        >
-                          power {{ event.payload.power }} · score {{ event.payload.score }}
-                        </div>
                         <p
                           v-if="typeof event.payload.reason === 'string' && event.payload.reason"
                           class="text-compact color-muted mt-1 pl-2 border-l border-mute whitespace-pre-wrap break-words"
@@ -510,7 +512,7 @@ useHead({
                             :class="winnerDotClass"
                             aria-hidden="true"
                           />
-                          <span class="color-base font-medium">{{ room.winner ? `${room.winner} won` : 'Draw' }}</span>
+                          <span class="color-base font-medium">{{ winnerNickname ? `${winnerNickname} won` : 'Draw' }}</span>
                           <span v-if="room.game?.finishReason" class="text-mini color-faint font-mono"> · {{ room.game.finishReason }}</span>
                         </template>
                         <template v-else>

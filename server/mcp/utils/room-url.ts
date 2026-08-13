@@ -13,11 +13,13 @@ export function getRoomUrl(roomId: string): string {
  * One-line watcher command returned by MCP tools that need to wait for room
  * updates. The script is served by the same origin, so the URL never needs
  * to be passed by the caller: dev requests get localhost, deployed requests
- * get the production host automatically.
+ * get the production host automatically. The token travels in the `bash`
+ * environment (`ZERO_PLAYER_TOKEN`, same convention as watch-room.ps1)
+ * instead of on the command line, so it never shows up in argv/`ps`.
  */
 export function getWatchCommand(roomId: string, token: string): string {
   const requestUrl = getRequestURL(useEvent())
-  return `curl -fsSL ${requestUrl.origin}/watch-room.sh | bash -s -- ${encodeURIComponent(roomId)} --token ${token}`
+  return `curl -fsSL ${requestUrl.origin}/watch-room.sh | ZERO_PLAYER_TOKEN=${token} bash -s -- ${encodeURIComponent(roomId)}`
 }
 
 /**

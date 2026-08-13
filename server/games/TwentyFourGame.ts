@@ -51,6 +51,13 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
 
   override readonly turnBased = false
 
+  /**
+   * Puzzles generated once per instance. `createInitialState` runs both in the
+   * constructor and in `start()`, so without memoization the same room would
+   * roll two independent puzzle sets and the first one would be thrown away.
+   */
+  private puzzles?: number[][]
+
   static readonly mcpMoveDefinition: GameMcpMoveDefinition = {
     gameId: twentyFourPointDefinition.id,
     toolName: 'make-24-point-move',
@@ -82,11 +89,14 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
   }
 
   createInitialState(): TwentyFourState {
-    const puzzles: number[][] = []
-    for (let index = 0; index < TWENTY_FOUR_QUESTIONS; index++)
-      puzzles.push(generatePuzzle())
+    if (!this.puzzles) {
+      const puzzles: number[][] = []
+      for (let index = 0; index < TWENTY_FOUR_QUESTIONS; index++)
+        puzzles.push(generatePuzzle())
+      this.puzzles = puzzles
+    }
     return {
-      puzzles,
+      puzzles: this.puzzles.map(puzzle => [...puzzle]),
       progress: {},
       attempts: {},
     }

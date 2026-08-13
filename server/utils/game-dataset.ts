@@ -82,7 +82,10 @@ export async function persistFinishedGame(room: Room): Promise<void> {
       createdAt: room.createdAt,
       startedAt: room.startedAt ?? null,
       endedAt: room.status === 'finished' ? room.finishedAt ?? null : room.abortedAt ?? null,
-      winner: room.winner ?? null,
+      // `room.winner` is a session id; the dataset keeps nicknames (leaderboard matches on them).
+      winner: room.winner
+        ? room.players.find(player => player.sessionId === room.winner)?.nickname ?? null
+        : null,
       finishReason: game.finishReason ?? null,
       finishDetails: game.finishDetails ? JSON.stringify(game.finishDetails) : null,
       players: JSON.stringify(room.players.map(player => ({

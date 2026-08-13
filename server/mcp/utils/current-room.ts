@@ -19,10 +19,12 @@ export async function getCurrentRoomId(sessionId: string): Promise<string> {
 export function describeRoomOutcome(room: Room, userId: string): string {
   if (room.status === 'aborted')
     return 'Match aborted'
-  const myNickname = room.players.find(player => player.sessionId === userId)?.nickname
-  if (room.winner && room.winner === myNickname)
+  // `room.winner` is a session id; only map to a nickname for display.
+  if (room.winner === userId)
     return 'Match ended: you won'
-  if (room.winner)
-    return `Match ended: ${room.winner} won`
+  if (room.winner) {
+    const winnerNickname = room.players.find(player => player.sessionId === room.winner)?.nickname
+    return `Match ended: ${winnerNickname ?? 'the opponent'} won`
+  }
   return 'Match ended: draw'
 }

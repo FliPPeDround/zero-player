@@ -23,8 +23,41 @@ function parseSocketData(data: unknown): Promise<string> {
   return Promise.resolve(String(data))
 }
 
+const FALLBACK_POLL_INTERVAL_MS = 5000
+
+/**
+ * While the WebSocket feed is down (Durable Object hiccups on Cloudflare,
+ * stale deploys, ...), poll the REST endpoint on a short interval so the
+ * page keeps updating even if the WS bridge fails entirely. The poller
+ * starts when the socket is disconnected and stops as soon as it reconnects
+ * or the feed reaches a terminal state.
+ */
+function watchFallbackPolling(connected: Ref<boolean>, poll: () => void, shouldStop?: () => boolean): void {
+  let timer: ReturnType<typeof setInterval> | null = null
+  const stop = (): void => {
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+    }
+  }
+  watch([connected, () => shouldStop?.() ?? false], ([isConnected, isStopped]) => {
+    if (!import.meta.client)
+      return
+    if (isConnected || isStopped) {
+      stop()
+      return
+    }
+    if (!timer) {
+      timer = setInterval(() => {
+        poll()
+      }, FALLBACK_POLL_INTERVAL_MS)
+    }
+  }, { immediate: true })
+  onScopeDispose(stop)
+}
+
 export async function useRoomListFeed() {
-  const { data: initialRooms } = await useFetch<RoomSummary[]>('/api/rooms')
+  const { data: initialRooms, refresh } = await useFetch<RoomSummary[]>('/api/rooms')
   const rooms = ref<RoomSummary[]>(initialRooms.value ?? [])
   const loaded = ref(true)
   const connected = ref(false)
@@ -58,6 +91,12 @@ export async function useRoomListFeed() {
     },
   })
 
+  // While the WebSocket is down (Durable Object hiccups on Cloudflare, stale
+  // deploys, ...), keep the lobby fresh by polling the REST endpoint instead.
+  watchFallbackPolling(connected, () => {
+    refresh().catch(() => {})
+  })
+
   return {
     rooms,
     loaded,
@@ -73,7 +112,7 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
   const error = ref<string | null>(null)
   const closed = ref(false)
 
-  const { data: initial, pending, error: fetchError } = await useFetch<Room>(
+  const { data: initial, pending, error: fetchError, refresh } = await useFetch<Room>(
     computed(() => `/api/rooms/${encodeURIComponent(id.value)}`),
     { immediate: true },
   )
@@ -122,6 +161,11 @@ export async function useRoomDetailFeed(roomId: MaybeRefOrGetter<string>) {
       },
     },
   )
+
+  // While the WebSocket is down, keep the board fresh by polling REST.
+  watchFallbackPolling(connected, () => {
+    refresh().catch(() => {})
+  }, () => closed.value)
 
   return {
     room,

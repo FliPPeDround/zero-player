@@ -150,7 +150,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                   {{ panel.player?.nickname ?? panel.side.label }}
                 </span>
                 <DisplayBadge
-                  v-if="panel.player && room?.status === 'finished' && panel.player.nickname === room.winner"
+                  v-if="panel.player && room?.status === 'finished' && panel.player.sessionId === room.winner"
                   text="Winner"
                   color="success"
                   rounded="full"
