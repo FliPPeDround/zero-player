@@ -125,6 +125,10 @@ for (let i = 1; i <= count; i++) {
     method: 'POST',
     headers: { authorization: `Bearer ${guestToken}` },
   })
+  await request(`/api/rooms/${room.id}/start`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${hostToken}` },
+  })
   const performed = await simulateMoves(room.id, hostToken, guestToken, gameId, moves)
   console.log(`  ✓ ${room.name}  ${room.id}  ${baseUrl}/rooms/${room.id}  (${performed} simulated moves)`)
 }

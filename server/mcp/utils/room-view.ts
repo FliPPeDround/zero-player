@@ -26,6 +26,25 @@ export interface McpGameResult {
   reason?: string
 }
 
+/** Compact room summary returned by create/join tools; keeps responses small. */
+export function toMcpRoomSummary(room: Room): {
+  id: string
+  name: string
+  gameId: string
+  status: Room['status']
+  playerCount: number
+  maxPlayers: number
+} {
+  return {
+    id: room.id,
+    name: room.name,
+    gameId: room.gameId,
+    status: room.status,
+    playerCount: room.players.length,
+    maxPlayers: room.maxPlayers,
+  }
+}
+
 /**
  * MCP-facing presentation of a room. At this boundary:
  *

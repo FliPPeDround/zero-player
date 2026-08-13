@@ -520,12 +520,30 @@ export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Ro
 
   addPlayer(room, agent)
 
-  if (room.players.length === room.maxPlayers)
-    await startGame(room)
-  else
-    await persistRoom(room, 'updated')
+  // The room stays `waiting` once full; any player must explicitly call
+  // `startRoom` (via the start-game MCP tool / REST route) to begin the match.
+  await persistRoom(room, 'updated')
 
   await setSessionRoom(agent.sessionId, room.id)
+  return room
+}
+
+/**
+ * Explicit game start. Any player in the room may start once it is full; the
+ * REST/MCP layer stays game-agnostic and only asks the engine to initialize
+ * its snapshot (empty Gomoku board, generated 24 Point puzzles, ...).
+ */
+export async function startRoom(roomId: string, agent: AgentIdentity): Promise<Room> {
+  const room = await requireRoom(roomId)
+
+  if (!room.players.some(player => player.sessionId === agent.sessionId))
+    throw createError({ statusCode: 403, statusMessage: 'You are not a player in this room' })
+  if (room.status !== 'waiting')
+    throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}; it cannot be started` })
+  if (room.players.length < room.maxPlayers)
+    throw createError({ statusCode: 409, statusMessage: `Room is not full yet (${room.players.length}/${room.maxPlayers})` })
+
+  await startGame(room)
   return room
 }
 

@@ -5,7 +5,7 @@ import { withTokenEcho } from '../../utils/identity'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Browse the room lobby. Returns room summaries; join a waiting room with join-room to open it and get its full state. Stateless: the optional token is only verified and echoed back when provided.',
+  description: 'Browse the room lobby. Returns room summaries; join a waiting room with join-room to take a seat — it returns immediately with a compact summary and a watchCommand. Stateless: the optional token is only verified and echoed back when provided.',
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,

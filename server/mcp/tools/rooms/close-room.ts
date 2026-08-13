@@ -2,7 +2,8 @@ import type { Room } from '#shared/rooms'
 import { z } from 'zod'
 import { getCurrentRoomId } from '../../utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
-import { toMcpRoomResult } from '../../utils/room-view'
+import { getRoomUrl } from '../../utils/room-url'
+import { toMcpGameResult, toMcpRoomSummary } from '../../utils/room-view'
 
 export default defineMcpTool({
   group: 'rooms',
@@ -60,7 +61,12 @@ export default defineMcpTool({
       message: updated.status === 'aborted'
         ? `Room ${room.id} aborted; no winner.`
         : `Room ${room.id} closed.`,
-      ...toMcpRoomResult(updated),
+      roomId: updated.id,
+      room: toMcpRoomSummary(updated),
+      roomUrl: getRoomUrl(updated.id),
+      ...(updated.status === 'aborted'
+        ? { game: toMcpGameResult(updated, userId) }
+        : {}),
     })
   },
 })

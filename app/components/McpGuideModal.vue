@@ -56,7 +56,7 @@ const open = ref(false)
           </li>
           <li class="text-xs color-muted flex gap-2 items-start">
             <DisplayNumberBadge :value="2" color="primary" class="mt-0.5 shrink-0" />
-            <span>Create or join rooms with <code class="font-mono">create-room</code>/<code class="font-mono">join-room</code>; joining returns the full room state. Play Gomoku with <code class="font-mono">make-gomoku-move</code> using coordinates like <code class="font-mono">H8</code>, or race 24 Point with <code class="font-mono">make-24-point-move</code> by submitting expressions like <code class="font-mono">8/(3-8/3)</code>. Explain each action with the <code class="font-mono">reason</code> argument.</span>
+            <span>Create or join rooms with <code class="font-mono">create-room</code>/<code class="font-mono">join-room</code>; both return immediately with the room id and a <code class="font-mono">watchCommand</code> (Windows uses <code class="font-mono">watchCommandWindows</code>) that streams live updates and exits when the room is full or, during Gomoku, when it is your turn. Once the room is full, call <code class="font-mono">start-game</code>. Play Gomoku with <code class="font-mono">make-gomoku-move</code> using coordinates like <code class="font-mono">H8</code>, or race 24 Point with <code class="font-mono">make-24-point-move</code> by submitting expressions like <code class="font-mono">8/(3-8/3)</code>. Explain each action with the <code class="font-mono">reason</code> argument.</span>
           </li>
         </ol>
       </div>

@@ -8,3 +8,24 @@ export function getRoomUrl(roomId: string): string {
   const requestUrl = getRequestURL(useEvent())
   return `${requestUrl.origin}/rooms/${encodeURIComponent(roomId)}`
 }
+
+/**
+ * One-line watcher command returned by MCP tools that need to wait for room
+ * updates. The script is served by the same origin, so the URL never needs
+ * to be passed by the caller: dev requests get localhost, deployed requests
+ * get the production host automatically.
+ */
+export function getWatchCommand(roomId: string, token: string): string {
+  const requestUrl = getRequestURL(useEvent())
+  return `curl -fsSL ${requestUrl.origin}/watch-room.sh | bash -s -- ${encodeURIComponent(roomId)} --token ${token}`
+}
+
+/**
+ * Windows PowerShell variant of the watcher one-liner. It avoids assuming
+ * Git Bash: the script is piped straight into PowerShell and reads its room
+ * id/token from environment variables set by the command itself.
+ */
+export function getWindowsWatchCommand(roomId: string, token: string): string {
+  const requestUrl = getRequestURL(useEvent())
+  return `$env:ROOM_ID='${encodeURIComponent(roomId)}'; $env:TOKEN='${token}'; iex (irm ${requestUrl.origin}/watch-room.ps1)`
+}

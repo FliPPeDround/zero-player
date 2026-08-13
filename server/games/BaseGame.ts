@@ -10,9 +10,10 @@ import type { GameDefinition } from '#shared/games'
 import type { Room } from '#shared/rooms'
 import { defineMcpTool } from '@nuxtjs/mcp-toolkit/server'
 import { z } from 'zod'
+import { describeRoomOutcome, getCurrentRoomId } from '../mcp/utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../mcp/utils/identity'
+import { getWatchCommand, getWindowsWatchCommand } from '../mcp/utils/room-url'
 import { toMcpGameResult } from '../mcp/utils/room-view'
-import { BLOCKING_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../mcp/utils/wait-message'
 
 export const GAME_SCHEMA_VERSION = 1
 
@@ -103,7 +104,7 @@ export abstract class BaseGame<
       name: definition.toolName,
       group: 'games',
       description: turnBased
-        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state immediately instead of blocking. It submits your move, then blocks for up to 180 seconds until the opponent replies or the match ends — the current board is included as an ASCII diagram in the board field. On timeout it returns the latest state with instructions to poll with get-room and call this tool again once it is your turn.`
+        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state and a watchCommand you can run in your shell to stream live updates until it is your turn. It submits your move and returns immediately with the updated state and ASCII board; when the opponent is thinking, the response includes a watchCommand you can run in your shell to stream live updates until it is your turn again.`
         : `${definition.description} Call this any time while the game is running. It submits your answer and returns immediately with the updated room state and correct/incorrect feedback — it never waits for the opponent.`,
       inputSchema: {
         ...definition.inputSchema,
@@ -121,17 +122,14 @@ export abstract class BaseGame<
         const agent = await requireAgentFromToken(rawToken)
         const token = String(rawToken)
         const userId = agent.sessionId
-        const timeoutMs = BLOCKING_WAIT_TIMEOUT_SECONDS * 1000
         const present = (room: Room) => toMcpGameResult(room, userId)
         const echo = (result: Record<string, unknown>) => withTokenEcho(result, token)
 
         const headers = { authorization: `Bearer ${token}` }
-        const { getCurrentRoomId, createRoomWaiter, describeRoomOutcome } = await import('../mcp/utils/current-room')
         const roomId = await getCurrentRoomId(userId)
 
         const isTerminal = (candidate: Room) => candidate.status === 'finished' || candidate.status === 'aborted'
         const isMyTurn = (candidate: Room) => candidate.status === 'playing' && candidate.game?.currentPlayerId === userId
-        const isDone = (candidate: Room) => isTerminal(candidate) || (turnBased && isMyTurn(candidate))
 
         const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
 
@@ -157,9 +155,16 @@ export abstract class BaseGame<
         }
 
         if (turnBased && !isMyTurn(room)) {
+          const watchCommand = getWatchCommand(room.id, token)
+          const watchCommandWindows = getWindowsWatchCommand(room.id, token)
+          const message = room.status === 'waiting'
+            ? `The game has not started. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when the room is full, then call start-game and ${definition.toolName} when it is your turn.`
+            : `It is not your turn yet. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when it is your turn, then call ${definition.toolName}.`
           return echo({
-            message: `It is not your turn yet. Use get-room (roomId: ${room.id}) to check the latest state; call ${definition.toolName} when it is your turn.`,
+            message,
             ...present(room),
+            watchCommand,
+            watchCommandWindows,
           })
         }
 
@@ -188,49 +193,36 @@ export abstract class BaseGame<
           return echo({ message, ...present(updatedRoom) })
         }
 
-        // It is our turn: subscribe for the reply before posting so the
-        // terminal event of a winning move is never missed.
-        const waiter = createRoomWaiter(roomId, isDone, timeoutMs)
-        try {
-          const updatedRoom = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/moves`, {
-            method: 'POST',
-            headers,
-            body: action,
-          })
+        // Turn-based move: submit and return immediately. If the opponent is
+        // now thinking, hand the agent a watcher command instead of blocking.
+        const updatedRoom = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/moves`, {
+          method: 'POST',
+          headers,
+          body: action,
+        })
 
-          if (isTerminal(updatedRoom) || isMyTurn(updatedRoom)) {
-            return echo({
-              message: isTerminal(updatedRoom)
-                ? `${definition.describeAction(args as Record<string, unknown>)}. ${describeRoomOutcome(updatedRoom, userId)}.`
-                : `${definition.describeAction(args as Record<string, unknown>)}. The opponent has moved — it is your turn.`,
-              ...present(updatedRoom),
-            })
-          }
-
-          const outcome = await waiter.wait()
-          const finalRoom = outcome.room ?? updatedRoom
-          if (outcome.closed)
-            return echo({ message: 'Room was closed.', ...present(finalRoom) })
-          if (outcome.timedOut) {
-            return echo({
-              message: `${definition.describeAction(args as Record<string, unknown>)}. ${waitTimeoutMessage({
-                waitedSeconds: BLOCKING_WAIT_TIMEOUT_SECONDS,
-                waitedFor: 'the opponent\'s reply',
-                continueHint: `The opponent may still be thinking. Poll with get-room (roomId: ${finalRoom.id}) to check the latest state; when it is your turn, call ${definition.toolName} again. Do not resubmit your move or leave the room.`,
-              })}`,
-              ...present(finalRoom),
-            })
-          }
+        if (isTerminal(updatedRoom)) {
           return echo({
-            message: isTerminal(finalRoom)
-              ? `${definition.describeAction(args as Record<string, unknown>)}. ${describeRoomOutcome(finalRoom, userId)}.`
-              : `${definition.describeAction(args as Record<string, unknown>)}. The opponent has moved — it is your turn.`,
-            ...present(finalRoom),
+            message: `${definition.describeAction(args as Record<string, unknown>)}. ${describeRoomOutcome(updatedRoom, userId)}.`,
+            ...present(updatedRoom),
           })
         }
-        finally {
-          waiter.cancel()
+
+        if (isMyTurn(updatedRoom)) {
+          return echo({
+            message: `${definition.describeAction(args as Record<string, unknown>)}. The opponent has moved — it is your turn.`,
+            ...present(updatedRoom),
+          })
         }
+
+        const watchCommand = getWatchCommand(roomId, token)
+        const watchCommandWindows = getWindowsWatchCommand(roomId, token)
+        return echo({
+          message: `${definition.describeAction(args as Record<string, unknown>)}. Move submitted — waiting for the opponent's reply. Run the returned watchCommand (Windows: watchCommandWindows) to stream live updates, or poll with get-room.`,
+          ...present(updatedRoom),
+          watchCommand,
+          watchCommandWindows,
+        })
       },
     })
   }
