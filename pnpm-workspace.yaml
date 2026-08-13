@@ -3,14 +3,7 @@ shellEmulator: true
 trustPolicy: no-downgrade
 packages: []
 autoInstallPeers: false
-catalog:
-  '@libsql/client': ^0.17.4
-  drizzle-kit: ^0.31.10
-  drizzle-orm: ^0.45.2
 catalogs:
-  agents:
-    '@nuxtjs/mcp-toolkit': ^0.18.1
-    agents: ^0.20.1
   auth:
     '@better-auth/cli': ^1.4.21
     better-auth: ^1.6.26
@@ -36,6 +29,7 @@ catalogs:
     leafer-ui: ^2.2.9
   db:
     '@libsql/client': ^0.17.4
+    drizzle-kit: ^0.31.10
     drizzle-orm: ^0.45.2
   design:
     '@antfu/design': ^0.3.3
@@ -57,6 +51,11 @@ catalogs:
     '@iconify-json/carbon': ^1.2.25
     '@iconify-json/ph': ^1.2.0
     '@iconify-json/twemoji': ^1.2.5
+  mcp:
+    '@modelcontextprotocol/client': ^2.0.0
+    '@modelcontextprotocol/server': ^2.0.0
+    '@nuxtjs/mcp-toolkit': ^0.18.1
+    agents: ^0.20.1
   server:
     '@nuxthub/core': ^0.10.8
     h3: ^1.15.11
