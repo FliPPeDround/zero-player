@@ -1,5 +1,6 @@
 // @unocss-include
 
+import { twentyFourPointDefinition } from './24-point'
 import { gomokuDefinition } from './gomoku'
 
 export interface GameSide {
@@ -31,6 +32,12 @@ export interface GameDefinition {
   maxPlayers: number
   /** Optional icon used to identify the game in room cards and headers. */
   icon?: string
+  /**
+   * `true` for lockstep turn-based games (e.g. Gomoku), where only the
+   * current player may submit actions. `false` for race games (e.g. 24 Point)
+   * where every player acts independently and move tools never block.
+   */
+  turnBased: boolean
 }
 
 /**
@@ -42,6 +49,7 @@ export interface GameDefinition {
  */
 export const GAMES = [
   gomokuDefinition,
+  twentyFourPointDefinition,
 ] as const satisfies readonly GameDefinition[]
 
 export type GameId = typeof GAMES[number]['id']
@@ -54,4 +62,8 @@ export function getGame(gameId: string): GameDefinition | undefined {
 
 export function getGameName(gameId: string): string {
   return getGame(gameId)?.name ?? gameId
+}
+
+export function isTurnBasedGame(gameId: string): boolean {
+  return getGame(gameId)?.turnBased !== false
 }

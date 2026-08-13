@@ -119,5 +119,6 @@ export const gomokuDefinition = {
   ],
   minPlayers: 2,
   maxPlayers: 2,
+  turnBased: true,
   icon: 'i-carbon-grid',
 } as const satisfies GameDefinition

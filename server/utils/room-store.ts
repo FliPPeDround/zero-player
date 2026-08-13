@@ -30,6 +30,7 @@ const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
 const latestRoomSnapshots = new Map<string, Room>()
 const spectatorCounts = new Map<string, number>()
+const gameMoveQueues = new Map<string, Promise<unknown>>()
 let roomListCache: { rooms: RoomSummary[], builtAt: number } | null = null
 
 const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
@@ -584,35 +585,52 @@ export async function emitGameMove(roomId: string, actor: string, payload: Recor
  * validates it, the new snapshot is persisted and broadcast, and the room is
  * finished when the engine reports a terminal state.
  */
-export async function submitGameMove(
+export function submitGameMove(
   roomId: string,
   playerId: string,
   action: GameActionRecord,
 ): Promise<Room> {
-  const room = await requireRoom(roomId)
+  return withRoomMoveSerialization(roomId, async () => {
+    const room = await requireRoom(roomId)
 
-  if (room.status !== 'playing')
-    throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}` })
+    if (room.status !== 'playing')
+      throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}` })
 
-  const game = createGameInstance(room)
-  const outcome = game.play(playerId, action)
-  if (!outcome.ok)
-    throw createError({ statusCode: 409, statusMessage: outcome.error })
+    const game = createGameInstance(room)
+    const outcome = game.play(playerId, action)
+    if (!outcome.ok)
+      throw createError({ statusCode: 409, statusMessage: outcome.error })
 
-  room.game = game.snapshot()
-  const player = room.players.find(player => player.sessionId === playerId)
-  appendEvent(room, 'move', player?.nickname, {
-    ...action,
-    ...(player?.slot ? { side: player.slot } : {}),
+    room.game = game.snapshot()
+    const player = room.players.find(player => player.sessionId === playerId)
+    appendEvent(room, 'move', player?.nickname, {
+      ...action,
+      ...(outcome.details ?? {}),
+      ...(player?.slot ? { side: player.slot } : {}),
+    })
+    await persistRoom(room, 'updated')
+
+    if (game.status === 'finished') {
+      const winnerNickname = room.players.find(player => player.sessionId === game.winner)?.nickname
+      await finishGame(roomId, winnerNickname ?? game.winner, room)
+    }
+
+    return room
   })
-  await persistRoom(room, 'updated')
+}
 
-  if (game.status === 'finished') {
-    const winnerNickname = room.players.find(player => player.sessionId === game.winner)?.nickname
-    await finishGame(roomId, winnerNickname ?? game.winner, room)
-  }
-
-  return room
+/**
+ * Race games (e.g. 24 Point) let both players submit at the same time. The
+ * KV room state is read-modify-write, so serialize submissions per room
+ * in-process to prevent two concurrent requests from clobbering each other.
+ * Across Worker isolates the first persisted write still wins; the loser sees
+ * the terminal room on its next get-room/move call.
+ */
+function withRoomMoveSerialization<T>(roomId: string, task: () => Promise<T>): Promise<T> {
+  const previous = gameMoveQueues.get(roomId) ?? Promise.resolve()
+  const run = previous.then(task, task)
+  gameMoveQueues.set(roomId, run.then(() => undefined, () => undefined))
+  return run
 }
 
 export async function finishGame(roomId: string, winner?: string, existingRoom?: Room): Promise<void> {

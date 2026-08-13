@@ -107,5 +107,7 @@ export async function persistFinishedGame(room: Room): Promise<void> {
 function moveNotation(gameId: string, action: GameActionRecord): string | null {
   if (gameId === 'gomoku' && typeof action.x === 'number' && typeof action.y === 'number')
     return gomokuMoveLabel({ x: action.x, y: action.y })
+  if (gameId === '24-point' && typeof action.expression === 'string' && action.expression.trim())
+    return action.expression.trim()
   return null
 }

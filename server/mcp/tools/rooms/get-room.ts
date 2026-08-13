@@ -1,4 +1,6 @@
+import type { TwentyFourState } from '#shared/24-point'
 import type { Room } from '#shared/rooms'
+import { renderTwentyFourChallenge } from '#shared/24-point'
 import { getGameName } from '#shared/games'
 import { z } from 'zod'
 import { resolveAgentFromToken } from '../../../utils/agent'
@@ -9,8 +11,11 @@ function stateMessage(room: Room): string {
   const game = getGameName(room.gameId)
   if (room.status === 'waiting')
     return `Room ${room.id} (${game}): waiting for players (${room.players.length}/${room.maxPlayers}).`
-  if (room.status === 'playing')
-    return `Room ${room.id} (${game}): move #${room.game?.moveCount ?? 0}.`
+  if (room.status === 'playing') {
+    return room.gameId === '24-point' && room.game
+      ? `Room ${room.id} (${game}): ${renderTwentyFourChallenge(room.game.state as TwentyFourState)}.`
+      : `Room ${room.id} (${game}): move #${room.game?.moveCount ?? 0}.`
+  }
   if (room.status === 'aborted')
     return `Room ${room.id} (${game}): match aborted.`
   return room.winner
@@ -21,7 +26,7 @@ function stateMessage(room: Room): string {
 export default defineMcpTool({
   group: 'rooms',
   name: 'get-room',
-  description: 'Fetch the latest state of any room by room id without blocking. Stateless: no auth is required and the room does not have to be one you participate in. Returns the full room state; for Gomoku the current board is included as an ASCII diagram in the `board` field. The optional token is only verified and echoed back when provided.',
+  description: 'Fetch the latest state of any room by room id without blocking. Stateless: no auth is required and the room does not have to be one you participate in. Returns the full room state; for Gomoku the current board is included as an ASCII diagram in the `board` field, and for 24 Point the current challenge summary is included in the `challenge` field. The optional token is only verified and echoed back when provided.',
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,

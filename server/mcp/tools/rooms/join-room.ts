@@ -1,14 +1,19 @@
 import type { Room } from '#shared/rooms'
+import { isTurnBasedGame } from '#shared/games'
 import { z } from 'zod'
 import { createRoomWaiter, describeRoomOutcome } from '../../utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
+import { getRoomUrl } from '../../utils/room-url'
 import { toMcpRoomResult } from '../../utils/room-view'
 import { BLOCKING_WAIT_TIMEOUT_SECONDS, waitTimeoutMessage } from '../../utils/wait-message'
 
-function joinedMessage(room: Room, userId: string): string {
+function joinedMessage(room: Room, userId: string, roomUrl: string): string {
+  const invitation = ` Invite a human to watch your match live at ${roomUrl}.`
+  if (room.status === 'playing' && isTurnBasedGame(room.gameId))
+    return `Joined room ${room.id}; it is your turn now — the opponent has moved.${invitation}`
   if (room.status === 'playing')
-    return `Joined room ${room.id}; it is your turn now — the opponent has moved.`
-  return describeRoomOutcome(room, userId)
+    return `Joined room ${room.id}; the game has started — solve all three questions now.${invitation}`
+  return `${describeRoomOutcome(room, userId)}.${invitation}`
 }
 
 export default defineMcpTool({
@@ -33,7 +38,9 @@ export default defineMcpTool({
     const tokenValue = String(token)
     const timeoutMs = BLOCKING_WAIT_TIMEOUT_SECONDS * 1000
     const echo = (result: Record<string, unknown>) => withTokenEcho(result, tokenValue)
-    const isDone = (candidate: Room) => candidate.status === 'finished' || candidate.status === 'aborted' || (candidate.status === 'playing' && candidate.game?.currentPlayerId === userId)
+    const isDone = (candidate: Room) => candidate.status === 'finished'
+      || candidate.status === 'aborted'
+      || (candidate.status === 'playing' && (!isTurnBasedGame(candidate.gameId) || candidate.game?.currentPlayerId === userId))
 
     // Subscribe before the join so the game-start update (and the opponent's
     // first move) can never slip in between the REST round trip and us.
@@ -46,7 +53,7 @@ export default defineMcpTool({
 
       if (isDone(room)) {
         waiter.cancel()
-        return echo({ message: joinedMessage(room, userId), ...toMcpRoomResult(room) })
+        return echo({ message: joinedMessage(room, userId, getRoomUrl(room.id)), ...toMcpRoomResult(room) })
       }
 
       const outcome = await waiter.wait()
@@ -55,15 +62,17 @@ export default defineMcpTool({
         return echo({ message: 'Room was closed.', ...toMcpRoomResult(finalRoom) })
       if (outcome.timedOut) {
         return echo({
-          message: waitTimeoutMessage({
+          message: `${waitTimeoutMessage({
             waitedSeconds: BLOCKING_WAIT_TIMEOUT_SECONDS,
             waitedFor: `the opponent's first move in room ${room.id}`,
-            continueHint: `Poll with get-room (roomId: ${finalRoom.id}) until it is your turn; then call make-${finalRoom.gameId}-move. Do not call join-room again or leave the room.`,
-          }),
+            continueHint: isTurnBasedGame(finalRoom.gameId)
+              ? `Poll with get-room (roomId: ${finalRoom.id}) until it is your turn; then call make-${finalRoom.gameId}-move. Do not call join-room again or leave the room.`
+              : `The game has started; poll with get-room (roomId: ${finalRoom.id}) if needed, then call make-${finalRoom.gameId}-move immediately. Do not call join-room again or leave the room.`,
+          })} Invite a human to watch your match live at ${getRoomUrl(finalRoom.id)}.`,
           ...toMcpRoomResult(finalRoom),
         })
       }
-      return echo({ message: joinedMessage(finalRoom, userId), ...toMcpRoomResult(finalRoom) })
+      return echo({ message: joinedMessage(finalRoom, userId, getRoomUrl(finalRoom.id)), ...toMcpRoomResult(finalRoom) })
     }
     finally {
       waiter.cancel()

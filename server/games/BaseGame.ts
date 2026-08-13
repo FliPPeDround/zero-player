@@ -33,6 +33,8 @@ export interface GameMcpMoveDefinition {
   toolName: string
   title: string
   description: string
+  /** Defaults to `true`; race games set this to `false` to skip turn gating and never block for the opponent. */
+  turnBased?: boolean
   inputSchema: Record<string, z.ZodType>
   inputExamples: Record<string, unknown>[]
   toAction: (args: Record<string, unknown>) => GameActionRecord
@@ -71,6 +73,9 @@ export abstract class BaseGame<
 
   readonly roomId: string
 
+  /** `false` for race games where every player acts independently. */
+  readonly turnBased: boolean = true
+
   protected readonly players: GamePlayer[]
   protected state: TState
   protected history: PlayedAction<TAction>[] = []
@@ -93,10 +98,13 @@ export abstract class BaseGame<
    * (multiple tools, custom annotations) can override this.
    */
   static defineMcpMoveTool(definition: GameMcpMoveDefinition) {
+    const turnBased = definition.turnBased !== false
     return defineMcpTool({
       name: definition.toolName,
       group: 'games',
-      description: `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state immediately instead of blocking. It submits your move, then blocks for up to 180 seconds until the opponent replies or the match ends — the current board is included as an ASCII diagram in the board field. On timeout it returns the latest state with instructions to poll with get-room and call this tool again once it is your turn.`,
+      description: turnBased
+        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state immediately instead of blocking. It submits your move, then blocks for up to 180 seconds until the opponent replies or the match ends — the current board is included as an ASCII diagram in the board field. On timeout it returns the latest state with instructions to poll with get-room and call this tool again once it is your turn.`
+        : `${definition.description} Call this any time while the game is running. It submits your answer and returns immediately with the updated room state and correct/incorrect feedback — it never waits for the opponent.`,
       inputSchema: {
         ...definition.inputSchema,
         token: z.string().optional().describe('Your login token from login; required for every stateful call'),
@@ -123,7 +131,7 @@ export abstract class BaseGame<
 
         const isTerminal = (candidate: Room) => candidate.status === 'finished' || candidate.status === 'aborted'
         const isMyTurn = (candidate: Room) => candidate.status === 'playing' && candidate.game?.currentPlayerId === userId
-        const isDone = (candidate: Room) => isTerminal(candidate) || isMyTurn(candidate)
+        const isDone = (candidate: Room) => isTerminal(candidate) || (turnBased && isMyTurn(candidate))
 
         const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
 
@@ -141,7 +149,14 @@ export abstract class BaseGame<
           })
         }
 
-        if (!isMyTurn(room)) {
+        if (!room.players.some(player => player.sessionId === userId)) {
+          throw createError({
+            statusCode: 403,
+            statusMessage: 'You are not a player in this room',
+          })
+        }
+
+        if (turnBased && !isMyTurn(room)) {
           return echo({
             message: `It is not your turn yet. Use get-room (roomId: ${room.id}) to check the latest state; call ${definition.toolName} when it is your turn.`,
             ...present(room),
@@ -149,6 +164,29 @@ export abstract class BaseGame<
         }
 
         const action = definition.toAction(args as Record<string, unknown>)
+
+        if (!turnBased) {
+          const updatedRoom = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}/moves`, {
+            method: 'POST',
+            headers,
+            body: action,
+          })
+          const lastEvent = updatedRoom.events.at(-1)
+          const payload = lastEvent?.type === 'move' ? (lastEvent.payload ?? {}) : {}
+          const state = updatedRoom.game?.state as { progress?: Record<string, number>, puzzles?: unknown[] } | undefined
+          const solved = state?.progress?.[userId] ?? 0
+          const total = state?.puzzles?.length ?? 3
+          const question = typeof payload.question === 'number' ? payload.question : Math.min(solved + 1, total)
+          const feedback = typeof payload.feedback === 'string' && payload.feedback.trim()
+            ? payload.feedback
+            : 'It does not equal 24 (or does not use the four numbers correctly).'
+          const message = isTerminal(updatedRoom)
+            ? `${definition.describeAction(args as Record<string, unknown>)}. ${describeRoomOutcome(updatedRoom, userId)}.`
+            : payload.correct === true
+              ? `${definition.describeAction(args as Record<string, unknown>)} — correct answer for question ${question}. You have solved ${solved}/${total} questions.`
+              : `${definition.describeAction(args as Record<string, unknown>)} — incorrect for question ${question}. ${feedback}`
+          return echo({ message, ...present(updatedRoom) })
+        }
 
         // It is our turn: subscribe for the reply before posting so the
         // terminal event of a winning move is never missed.
@@ -260,7 +298,7 @@ export abstract class BaseGame<
   play(playerId: string, action: TAction): MoveOutcome {
     if (this._status !== 'playing')
       return { ok: false, error: `Game is ${this._status}` }
-    if (this.currentPlayerId !== playerId)
+    if (this.turnBased && this.currentPlayerId !== playerId)
       return { ok: false, error: 'Not your turn' }
 
     const validationError = this.validateAction(playerId, action)
@@ -270,6 +308,7 @@ export abstract class BaseGame<
     this.state = this.applyAction(this.state, action, playerId)
     this.history.push({ playerId, action: { ...action } })
 
+    const moveMetadata = this.getMoveMetadata(playerId, action)
     const result = this.getResult(this.state, this.history, this.players)
     if (result) {
       this._status = 'finished'
@@ -283,8 +322,17 @@ export abstract class BaseGame<
       finished: this._status === 'finished',
       winner: this._winner,
       reason: this._finishReason,
-      details: this._finishDetails,
+      details: { ...moveMetadata, ...result?.details },
     }
+  }
+
+  /**
+   * Optional per-move metadata that room events should carry. Turn-based
+   * games usually return nothing; race games can add fields such as the
+   * question number and whether the answer was correct.
+   */
+  protected getMoveMetadata(_playerId: string, _action: TAction): Record<string, unknown> | undefined {
+    return undefined
   }
 
   resign(playerId: string): MoveOutcome {

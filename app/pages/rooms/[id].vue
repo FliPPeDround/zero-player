@@ -30,6 +30,7 @@ const firstSide = computed(() => gameSides.value[0])
 const secondSide = computed(() => gameSides.value[1])
 const isVersus = computed(() => gameSides.value.length === 2)
 const isGomoku = computed(() => room.value?.gameId === 'gomoku')
+const isTwentyFour = computed(() => room.value?.gameId === '24-point')
 
 const turnLabel = computed(() => {
   const game = room.value?.game
@@ -39,6 +40,8 @@ const turnLabel = computed(() => {
     return 'Aborted'
   if (game.status === 'finished')
     return game.winner ? 'Finished' : 'Draw'
+  if (isTwentyFour.value)
+    return 'Racing'
   if (!game.currentPlayerId)
     return 'Waiting'
   const index = game.players.findIndex(player => player.sessionId === game.currentPlayerId)
@@ -224,10 +227,13 @@ useHead({
     </FeedbackEmptyState>
 
     <template v-else-if="room">
-      <div class="gap-4 grid items-stretch lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
+      <div
+        class="gap-4 grid items-stretch"
+        :class="isTwentyFour ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]'"
+      >
         <div class="flex flex-col gap-4 min-w-0">
           <section
-            v-if="isVersus && !isGomoku"
+            v-if="isVersus && !isGomoku && !isTwentyFour"
             class="gap-3 grid items-stretch md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
           >
             <RoomPlayerCard
@@ -246,7 +252,7 @@ useHead({
               :highlight="room.status === 'finished' && secondPlayer?.nickname === room.winner"
             />
           </section>
-          <section v-else-if="!isGomoku" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
+          <section v-else-if="!isGomoku && !isTwentyFour" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
             <RoomPlayerCard
               v-for="(player, index) in players"
               :key="player.sessionId"
@@ -364,9 +370,13 @@ useHead({
               </div>
             </LayoutCard>
           </section>
+
+          <section v-else-if="isTwentyFour" class="gap-4 grid">
+            <TwentyFourBoard :room="room" />
+          </section>
         </div>
 
-        <aside class="flex flex-col gap-4 min-h-0 min-w-0">
+        <aside v-if="!isTwentyFour" class="flex flex-col gap-4 min-h-0 min-w-0">
           <LayoutCard class="flex flex-col gap-3">
             <LayoutSeparator label="Match info" />
             <DisplayKeyValue label="Game" :value="gameName" />
@@ -399,7 +409,11 @@ useHead({
             </DisplayKeyValue>
           </LayoutCard>
 
-          <LayoutCard :padding="false" class="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
+          <LayoutCard
+            v-if="!isTwentyFour"
+            :padding="false"
+            class="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden"
+          >
             <div class="px-3 py-2 border-b border-base flex items-center">
               <div class="flex gap-2 items-center">
                 <h2 class="text-sm font-medium">
@@ -446,7 +460,7 @@ useHead({
                           </template>
                           <template v-else>
                             <span class="text-sm color-base font-medium font-mono shrink-0">
-                              {{ event.payload.move }}
+                              {{ event.payload.expression ?? event.payload.move }}
                             </span>
                           </template>
                           <span class="flex-1" aria-hidden="true" />
@@ -457,7 +471,17 @@ useHead({
                           />
                         </div>
                         <div
-                          v-if="event.payload.type !== 'place'"
+                          v-if="event.payload.type === 'answer'"
+                          class="text-mini color-muted font-mono mt-0.5 tabular-nums"
+                        >
+                          Q{{ event.payload.question ?? '?' }} ·
+                          {{ event.payload.correct ? 'Correct' : 'Wrong' }}
+                          <template v-if="typeof event.payload.feedback === 'string' && event.payload.feedback">
+                            · {{ event.payload.feedback }}
+                          </template>
+                        </div>
+                        <div
+                          v-if="event.payload.type !== 'place' && event.payload.type !== 'answer'"
                           class="text-mini color-faint font-mono mt-0.5 tabular-nums"
                         >
                           power {{ event.payload.power }} · score {{ event.payload.score }}

@@ -1,6 +1,9 @@
+import type { TwentyFourState } from '#shared/24-point'
 import type { GomokuState } from '#shared/gomoku'
 import type { Room } from '#shared/rooms'
+import { renderTwentyFourChallenge } from '#shared/24-point'
 import { gomokuMoveLabel, renderGomokuBoard } from '#shared/gomoku'
+import { getRoomUrl } from './room-url'
 
 export interface McpGameResult {
   roomId: string
@@ -13,6 +16,12 @@ export interface McpGameResult {
   /** Latest move in human game notation, e.g. H8. */
   lastMove?: string
   board?: string
+  /** Race-game challenge summary, e.g. the current 24 Point question. */
+  challenge?: string
+  /** Current question number for the caller's race game. */
+  question?: number
+  /** Questions the caller has already solved in a race game. */
+  solved?: number
   winner?: 'you' | 'opponent' | 'draw'
   reason?: string
 }
@@ -57,12 +66,17 @@ export function renderRoomBoard(room: Room): string | undefined {
     : undefined
 }
 
-/** Room plus ASCII board, the shape every MCP tool returns to callers. */
-export function toMcpRoomResult(room: Room): { room: Room, board?: string } {
+/** Room plus spectator URL, ASCII board / challenge summary — the shape every MCP tool returns to callers. */
+export function toMcpRoomResult(room: Room): { room: Room, roomUrl: string, board?: string, challenge?: string } {
   const board = renderRoomBoard(room)
+  const challenge = room.gameId === '24-point' && room.game
+    ? renderTwentyFourChallenge(room.game.state as TwentyFourState)
+    : undefined
   return {
     room: toMcpRoomView(room),
+    roomUrl: getRoomUrl(room.id),
     ...(board ? { board } : {}),
+    ...(challenge ? { challenge } : {}),
   }
 }
 
@@ -92,6 +106,14 @@ export function toMcpGameResult(room: Room, userId: string): McpGameResult {
     const state = room.game.state as GomokuState
     if (state.lastMove)
       result.lastMove = gomokuMoveLabel(state.lastMove)
+  }
+
+  if (room.gameId === '24-point' && room.game) {
+    const state = room.game.state as TwentyFourState
+    const solved = state.progress[userId] ?? 0
+    result.question = Math.min(solved + 1, state.puzzles.length)
+    result.solved = solved
+    result.challenge = renderTwentyFourChallenge(state, userId)
   }
 
   const board = renderRoomBoard(room)
