@@ -24,10 +24,11 @@
     "@antfu/design": "catalog:design",
     "@leafer-in/animate": "catalog:canvas",
     "@leafer-in/color": "catalog:canvas",
-    "@libsql/client": "catalog:",
+    "@libsql/client": "catalog:db",
+    "agents": "catalog:agents",
     "better-auth": "catalog:auth",
     "colorjs.io": "catalog:design",
-    "drizzle-orm": "catalog:",
+    "drizzle-orm": "catalog:db",
     "floating-vue": "catalog:design",
     "leafer-ui": "catalog:canvas",
     "reka-ui": "catalog:design"

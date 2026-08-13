@@ -10,6 +10,7 @@ catalog:
 catalogs:
   agents:
     '@nuxtjs/mcp-toolkit': ^0.18.1
+    agents: ^0.20.1
   auth:
     '@better-auth/cli': ^1.4.21
     better-auth: ^1.6.26
@@ -33,6 +34,9 @@ catalogs:
     '@leafer-in/animate': ^2.2.9
     '@leafer-in/color': ^2.2.9
     leafer-ui: ^2.2.9
+  db:
+    '@libsql/client': ^0.17.4
+    drizzle-orm: ^0.45.2
   design:
     '@antfu/design': ^0.3.3
     colorjs.io: ^0.6.0
