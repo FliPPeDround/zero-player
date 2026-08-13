@@ -3,8 +3,6 @@ shellEmulator: true
 trustPolicy: no-downgrade
 packages: []
 autoInstallPeers: false
-patchedDependencies:
-  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch
 catalog:
   '@libsql/client': ^0.17.4
   drizzle-kit: ^0.31.10
