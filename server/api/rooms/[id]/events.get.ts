@@ -282,13 +282,13 @@ export default defineEventHandler(async (event) => {
   })
 
   if (stopped) {
-    await sendPromise
+    void sendPromise
     return
   }
 
   if (initial.status === 'waiting') {
     const snapshot = presentWaiting(initial)
-    await sendJson(snapshot)
+    void sendJson(snapshot)
     if (snapshot.ready)
       stop()
     else
@@ -298,16 +298,16 @@ export default defineEventHandler(async (event) => {
     if (userId && tokenValue) {
       const myTurn = initial.status === 'playing' && initial.game?.currentPlayerId === userId
       if (isTerminal(initial) || myTurn) {
-        await sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
+        void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
         stop()
       }
       else {
-        await sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
+        void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
         schedulePoll(0)
       }
     }
     else {
-      await sendJson(presentFull('snapshot', initial))
+      void sendJson(presentFull('snapshot', initial))
       if (isTerminal(initial))
         stop()
       else
@@ -315,5 +315,5 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  await sendPromise
+  void sendPromise
 })

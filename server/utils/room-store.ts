@@ -63,7 +63,6 @@ interface DurableObjectBinding {
 
 type DurableGlobal = typeof globalThis & {
   __env__?: Record<string, unknown>
-  __zeroPlayerDurableObject?: boolean
 }
 
 function envMs(name: string, fallback: number): number {
@@ -153,13 +152,15 @@ function emitDetail(roomId: string, message: RoomDetailMessage): RoomDetailMessa
  */
 function getDurableObjectStub(): DurableObjectStub | null {
   const g = globalThis as DurableGlobal
-  if (g.__zeroPlayerDurableObject)
-    return null
   try {
     const event = useEvent()
-    const durableFetch = (event.context._platform?.cloudflare as {
+    const platform = event.context._platform?.cloudflare as {
       durableFetch?: (request: Request) => Promise<Response>
-    } | undefined)?.durableFetch
+      durable?: unknown
+    } | undefined
+    if (platform?.durable !== undefined)
+      return null
+    const durableFetch = platform?.durableFetch
     if (typeof durableFetch === 'function')
       return { fetch: request => durableFetch(request) }
   }

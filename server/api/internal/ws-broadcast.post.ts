@@ -8,7 +8,6 @@ import { dispatchRoomHubBroadcast } from '../../utils/room-store'
  */
 export default defineEventHandler(async (event) => {
   const inDurableObject = event.context._platform?.cloudflare?.durable !== undefined
-    || (globalThis as typeof globalThis & { __zeroPlayerDurableObject?: boolean }).__zeroPlayerDurableObject === true
   if (!inDurableObject)
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
 
