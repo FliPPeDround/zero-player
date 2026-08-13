@@ -26,12 +26,15 @@ interface TwentyFourPanel {
   attempts: number
   currentNumbers: number[]
   currentQuestion: number
+  viewedQuestion: number
+  isCurrent: boolean
   events: RoomEvent[]
   accentClass: string
   badgeColor: 'primary'
 }
 
 const now = useNow({ interval: 1000 })
+const selectedQuestion = ref<Record<string, number>>({})
 
 const state = computed<TwentyFourState | null>(() => {
   const value = props.room?.game?.state
@@ -48,11 +51,14 @@ const panels = computed<TwentyFourPanel[]>(() => (
     const solved = player ? (state.value?.progress[player.sessionId] ?? 0) : 0
     const attempts = player ? (state.value?.attempts[player.sessionId] ?? 0) : 0
     const puzzleCount = state.value?.puzzles.length ?? TWENTY_FOUR_QUESTIONS
-    const currentIndex = Math.min(solved, puzzleCount - 1)
+    const currentQuestion = Math.min(solved + 1, puzzleCount)
+    const viewedQuestion = selectedQuestion.value[side.key] ?? currentQuestion
+    const viewedIndex = Math.min(viewedQuestion - 1, puzzleCount - 1)
     const events = player
       ? (props.room?.events ?? []).filter(event => (
           event.type === 'move'
           && event.payload?.side === side.key
+          && event.payload?.question === viewedQuestion
         ))
       : []
     return {
@@ -60,14 +66,20 @@ const panels = computed<TwentyFourPanel[]>(() => (
       player,
       solved,
       attempts,
-      currentNumbers: state.value?.puzzles[currentIndex] ?? [],
-      currentQuestion: Math.min(solved + 1, puzzleCount),
+      currentNumbers: state.value?.puzzles[viewedIndex] ?? [],
+      currentQuestion,
+      viewedQuestion,
+      isCurrent: viewedQuestion === currentQuestion,
       events,
       accentClass: 'bg-primary-500',
       badgeColor: 'primary',
     }
   })
 ))
+
+function viewQuestion(sideKey: string, question: number): void {
+  selectedQuestion.value[sideKey] = question
+}
 
 const elapsedMs = computed(() => {
   const startedAt = props.room?.startedAt ? new Date(props.room.startedAt).getTime() : 0
@@ -80,6 +92,8 @@ const elapsedMs = computed(() => {
 })
 
 function questionDotClass(panel: TwentyFourPanel, question: number): string {
+  if (question === panel.viewedQuestion)
+    return `${panel.accentClass} ring-2 ring-primary-500/60`
   if (question <= panel.solved)
     return panel.accentClass
   if (question === panel.currentQuestion)
@@ -180,7 +194,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                   Question
                 </span>
                 <DisplayNumberBadge
-                  :value="panel.currentQuestion"
+                  :value="panel.viewedQuestion"
                   :color="panel.badgeColor"
                   class="shrink-0"
                 />
@@ -189,19 +203,27 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 </span>
               </div>
               <DisplayBadge
-                :text="panel.solved >= TWENTY_FOUR_QUESTIONS ? 'Done' : 'Current'"
-                :color="panel.solved >= TWENTY_FOUR_QUESTIONS ? 'success' : panel.badgeColor"
+                :text="panel.solved >= TWENTY_FOUR_QUESTIONS
+                  ? 'Done'
+                  : panel.isCurrent ? 'Current' : 'Viewing'"
+                :color="panel.solved >= TWENTY_FOUR_QUESTIONS
+                  ? 'success'
+                  : panel.isCurrent ? panel.badgeColor : false"
                 rounded="full"
-                class="text-mini shrink-0"
+                class="text-mini shrink-0 w-20 justify-center"
               />
             </div>
 
             <div class="flex gap-1.5" aria-label="Question progress">
-              <span
+              <button
                 v-for="question in TWENTY_FOUR_QUESTIONS"
                 :key="question"
-                class="rounded-full flex-1 h-1.5 transition-all"
+                type="button"
+                class="rounded-full flex-1 h-2.5 cursor-pointer transition-all hover:op-80 focus-visible:ring-2 focus-visible:ring-primary-500/40"
                 :class="questionDotClass(panel, question)"
+                :aria-pressed="panel.viewedQuestion === question"
+                :aria-label="`Show question ${question}`"
+                @click="viewQuestion(panel.side.key, question)"
               />
             </div>
 
@@ -231,50 +253,49 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 <h3 class="text-sm font-medium flex gap-1.5 items-center">
                   <span class="i-carbon-list-boxes color-muted" aria-hidden="true" />
                   Attempt log
+                  <DisplayBadge
+                    :text="`Q${panel.viewedQuestion}`"
+                    :color="false"
+                    class="text-mini"
+                  />
                 </h3>
-                <DisplayNumberBadge :value="panel.events.length" />
               </div>
               <div class="max-h-80 overflow-y-auto">
                 <ol v-if="panel.events.length" class="py-1">
                   <li
                     v-for="(event, index) in panel.events"
                     :key="event.id"
-                    class="px-3 py-2.5 border-t border-mute flex gap-3 first:border-t-0"
+                    class="px-3 py-2.5 border-t border-mute flex gap-3 items-start first:border-t-0"
                   >
-                    <div class="flex shrink-0 flex-col gap-1 items-center">
+                    <div class="flex shrink-0 flex-col gap-1.5 items-center">
                       <DisplayNumberBadge :value="index + 1" prefix="#" class="shrink-0" />
                       <DisplayBadge
-                        :text="`Q${event.payload?.question ?? '?'}`"
-                        :color="false"
-                        class="text-mini"
+                        :text="event.payload?.correct ? 'Correct' : 'Wrong'"
+                        :color="event.payload?.correct ? 'success' : 'error'"
+                        rounded="full"
+                        class="text-mini shrink-0"
                       />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <div class="flex gap-x-2 items-center justify-between">
-                        <DisplayBadge
-                          :text="event.payload?.correct ? 'Correct' : 'Wrong'"
-                          :color="event.payload?.correct ? 'success' : 'error'"
-                          rounded="full"
-                          class="text-mini shrink-0"
-                        />
+                      <div class="flex gap-3 items-start justify-between">
+                        <div class="text-sm font-medium font-mono min-w-0 break-words">
+                          {{ event.payload?.expression ?? event.payload?.move }}
+                        </div>
                         <DisplayDate
                           :date="event.at"
                           :live="room?.status === 'playing'"
-                          class="text-mini color-faint shrink-0"
+                          class="text-mini color-faint mt-0.5 shrink-0"
                         />
                       </div>
-                      <div class="text-sm font-medium font-mono mt-1 break-words">
-                        {{ event.payload?.expression ?? event.payload?.move }}
-                      </div>
                       <p
-                        v-if="typeof event.payload?.feedback === 'string' && event.payload.feedback"
+                        v-if="!event.payload?.correct && typeof event.payload?.feedback === 'string' && event.payload.feedback"
                         class="text-mini color-muted mt-1"
                       >
                         {{ event.payload.feedback }}
                       </p>
                       <p
                         v-if="typeof event.payload?.reason === 'string' && event.payload.reason"
-                        class="text-compact color-muted mt-1 pl-2 border-l border-mute whitespace-pre-wrap break-words"
+                        class="text-compact color-muted mt-1 whitespace-pre-wrap break-words"
                       >
                         {{ event.payload.reason }}
                       </p>
