@@ -1,20 +1,20 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import process from 'node:process'
 
 import { mcpDescription, mcpInstructions } from './app/config/mcp'
 import { pwa } from './app/config/pwa'
 import { appDescription } from './app/constants/index'
 
-const isCloudflareBuild = process.env.WORKERS_CI_BRANCH !== undefined
-  || process.env.NITRO_PRESET?.includes('cloudflare')
-const cloudflareDatabaseId = process.env.NUXT_HUB_CLOUDFLARE_DATABASE_ID || process.env.CLOUDFLARE_DATABASE_ID || 'e657e3d5-08c4-44c0-88e4-5ebe3b81b84d'
-const cloudflareKvNamespaceId = process.env.NUXT_HUB_CLOUDFLARE_KV_ID || process.env.CLOUDFLARE_KV_ID || 'cae1f88741154b8bacc6ef00f674b716'
+const libsqlTraceIncludes = ['darwin-arm64', 'linux-x64-gnu', 'linux-x64-musl']
+  .map(name => resolve(process.cwd(), `node_modules/@libsql/${name}`))
+  .filter(dir => existsSync(dir))
+  .flatMap(dir => [resolve(dir, 'package.json'), resolve(dir, 'index.node')])
 
-if (isCloudflareBuild && !cloudflareDatabaseId) {
-  console.warn('[nuxt:hub] Missing NUXT_HUB_CLOUDFLARE_DATABASE_ID (or CLOUDFLARE_DATABASE_ID) build-time variable: the D1 `DB` binding will not be generated.')
-}
-if (isCloudflareBuild && !cloudflareKvNamespaceId) {
-  console.warn('[nuxt:hub] Missing NUXT_HUB_CLOUDFLARE_KV_ID (or CLOUDFLARE_KV_ID) build-time variable: the KV `KV` binding will not be generated.')
-}
+// NuxtHub generates a lazy DB client when no connection URL is provided, so
+// the SQLite file is only opened after the startup migration plugin creates
+// `.data/db`. This default keeps local dev working without a .env file.
+process.env.DATABASE_URL ||= 'file:.data/db/sqlite.db'
 
 export default defineNuxtConfig({
   modules: [
@@ -74,27 +74,14 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-09-19',
 
   nitro: {
-    cloudflare: {
-      wrangler: {
-        durable_objects: {
-          bindings: [
-            { name: '$DurableObject', class_name: '$DurableObject' },
-          ],
-        },
-        migrations: [
-          { tag: 'v1', new_sqlite_classes: ['$DurableObject'] },
-        ],
-        routes: [
-          { pattern: 'zeroplayer.space', custom_domain: true },
-          { pattern: 'www.zeroplayer.space', custom_domain: true },
-        ],
-        triggers: {
-          crons: ['0 2 * * *'],
-        },
-      },
+    preset: 'node-server',
+    externals: {
+      // Keep the libsql native binary in the traced server output; without it
+      // Nitro copies only the package metadata and the server fails to load.
+      traceInclude: libsqlTraceIncludes,
     },
     scheduledTasks: {
-      '0 2 * * *': ['rooms:cleanup'],
+      '*/5 * * * *': ['rooms:cleanup'],
     },
     esbuild: {
       options: {
@@ -111,41 +98,21 @@ export default defineNuxtConfig({
       websocket: true,
       asyncContext: true,
     },
-    preset: 'cloudflare-durable',
   },
 
   hub: {
-    // Cloudflare Workers builds need explicit resource IDs, otherwise
-    // NuxtHub cannot generate the `KV` / `DB` bindings in
-    // `.output/server/wrangler.json`. Set these in the build environment:
-    //   - NUXT_HUB_CLOUDFLARE_KV_ID (KV namespace ID)
-    //   - NUXT_HUB_CLOUDFLARE_DATABASE_ID (D1 database ID)
-    // `CLOUDFLARE_KV_ID` / `CLOUDFLARE_DATABASE_ID` are accepted as aliases.
-    // Local dev: NuxtHub keys off the hardcoded `cloudflare-durable` preset,
-    // so without an explicit driver it would try to use a `KV` binding that
-    // does not exist in Node. Use the local fs store instead.
-    kv: isCloudflareBuild
-      ? {
-          driver: 'cloudflare-kv-binding',
-          binding: 'KV',
-          namespaceId: cloudflareKvNamespaceId || '',
-        }
-      : {
-          driver: 'fs-lite',
-          base: '.data/kv',
-        },
-    // SQLite in local dev (`.data/db/sqlite.db`), D1 on Cloudflare deploy.
-    // Used to archive finished games as a public AI dataset.
-    db: isCloudflareBuild
-      ? {
-          dialect: 'sqlite',
-          driver: 'd1',
-          connection: {
-            databaseId: cloudflareDatabaseId || '',
-          },
-          applyMigrationsDuringBuild: false,
-        }
-      : 'sqlite',
+    // Local single-server storage: file-backed KV and SQLite.
+    kv: {
+      driver: 'fs-lite',
+      base: '.data/kv',
+    },
+    db: {
+      dialect: 'sqlite',
+      driver: 'libsql',
+      connection: {},
+      applyMigrationsDuringBuild: false,
+      applyMigrationsDuringDev: true,
+    },
   },
 
   eslint: {
@@ -162,9 +129,8 @@ export default defineNuxtConfig({
     description: mcpDescription,
     instructions: mcpInstructions,
     // Identity is carried by the short token returned from `login` and echoed
-    // in every tool response, so MCP sessions are never needed — Node and
-    // Cloudflare both serve stateless JSON transports. The existing Cloudflare
-    // provider patch remains required for that runtime.
+    // in every tool response, so MCP sessions are never needed — Node serves
+    // stateless JSON transports.
     sessions: false,
   },
 

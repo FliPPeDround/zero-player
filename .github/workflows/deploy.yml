@@ -1,0 +1,64 @@
+name: Deploy to Tencent Cloud
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: zero-player-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package app
+        run: |
+          tar -czf /tmp/zero-player.tar.gz \
+            --exclude='./.git' \
+            --exclude='./node_modules' \
+            --exclude='./.output' \
+            --exclude='./.data' \
+            --exclude='./.env' \
+            .
+
+      - name: Upload app to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          source: /tmp/zero-player.tar.gz
+          target: /tmp
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL || 'https://zeroplayer.space' }}
+          AGENT_TOKEN_TTL_DAYS: ${{ secrets.AGENT_TOKEN_TTL_DAYS || '30' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'file:.data/db/sqlite.db' }}
+          SERVER_APP_DIR: ${{ secrets.SERVER_APP_DIR }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          envs: BETTER_AUTH_SECRET,BETTER_AUTH_URL,AGENT_TOKEN_TTL_DAYS,DATABASE_URL,SERVER_APP_DIR
+          script: |
+            set -euo pipefail
+            APP_DIR="${SERVER_APP_DIR:-$HOME/zero-player}"
+            mkdir -p "$APP_DIR"
+            tar -xzf /tmp/zero-player.tar.gz -C "$APP_DIR"
+            cd "$APP_DIR"
+            bash scripts/deploy.sh

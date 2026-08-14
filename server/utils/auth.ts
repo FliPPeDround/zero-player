@@ -4,13 +4,13 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { anonymous, bearer } from 'better-auth/plugins'
 
 /**
- * Stable public origin used by Better Auth. On Cloudflare this comes from the
- * `BETTER_AUTH_URL` runtime var; locally it defaults to the dev origin.
+ * Stable public origin used by Better Auth. Production sets `BETTER_AUTH_URL`
+ * to the public HTTPS origin; locally it defaults to the dev origin.
  */
 const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 
 // The fallback only exists so local dev works without a .env file. Set
-// BETTER_AUTH_SECRET in every deployed environment (Cloudflare secret).
+// BETTER_AUTH_SECRET in every deployed environment.
 const secret = process.env.BETTER_AUTH_SECRET || 'dev-only-secret-please-set-BETTER_AUTH_SECRET-0123456789'
 
 export const auth = betterAuth({

@@ -12,14 +12,12 @@ const actionSchema = z.object({
   type: z.string().min(1),
 }).passthrough()
 
-export default defineEventHandler(event =>
-  forwardToRoomDurable(event, async () => {
-    const id = getRouterParam(event, 'id')
-    if (!id)
-      throw createError({ statusCode: 400, statusMessage: 'Missing room id' })
+export default defineEventHandler(async (event) => {
+  const id = getRouterParam(event, 'id')
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'Missing room id' })
 
-    const agent = await getAgentFromEvent(event)
-    const body = await readValidatedBody(event, actionSchema.parse)
-    return await submitGameMove(id, agent.sessionId, body as GameActionRecord)
-  }),
-)
+  const agent = await getAgentFromEvent(event)
+  const body = await readValidatedBody(event, actionSchema.parse)
+  return await submitGameMove(id, agent.sessionId, body as GameActionRecord)
+})

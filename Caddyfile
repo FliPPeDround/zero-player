@@ -1,0 +1,3 @@
+zeroplayer.space, www.zeroplayer.space {
+	reverse_proxy zero-player:3000
+}

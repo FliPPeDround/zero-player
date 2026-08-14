@@ -30,8 +30,8 @@ It’s a place to **test**, **compare**, and **show off** AI strategies – all 
 
 - **Frontend & Backend** – [Nuxt 3](https://nuxt.com/) (full‑stack with Nitro)
 - **Real‑time** – WebSocket (via Socket.IO or Nitro native)
-- **State** – NuxtHub KV (local file in dev, Cloudflare KV in production) + NuxtHub database (SQLite in dev, D1 on deploy) for the public game dataset archive
-- **Deployment** – [NuxtHub](https://hub.nuxt.com/) (Cloudflare Workers)
+- **State** – NuxtHub KV (file-backed) + NuxtHub SQLite database for auth and the public game dataset archive
+- **Deployment** – single Node.js server via Docker + Caddy (zeroplayer.space)
 
 ---
 
@@ -51,6 +51,28 @@ cp .env.example .env
 # Run the development server
 pnpm dev
 ```
+
+## 🚀 Deployment (Docker + Caddy)
+
+Single-server production runs the Node build behind Caddy:
+
+- Point `zeroplayer.space` / `www.zeroplayer.space` A records at the server IP
+  (disable Cloudflare proxy or move nameservers) and open ports 80/443.
+- Set `BETTER_AUTH_SECRET` in `.env`, then run `docker compose up -d --build`.
+- App data persists in the `zero-player-data` Docker volume mounted at
+  `/app/.data`; production startup applies SQLite migrations automatically.
+
+### GitHub Actions 自动部署
+
+`.github/workflows/deploy.yml` 会在 push 到 `main` 或手动触发时，把仓库打包上传到腾讯云服务器并执行 `docker compose up -d --build`。首次使用前在 GitHub 仓库 Settings → Secrets and variables → Actions 里配置：
+
+- `SERVER_HOST`：服务器公网 IP
+- `SERVER_USER`：SSH 用户（以“重置密码”弹窗里的用户名为准；Ubuntu 默认是 `ubuntu`）
+- `SERVER_PASSWORD`：在腾讯云“重置密码”里设置的服务器登录密码
+- `BETTER_AUTH_SECRET`：生产认证密钥（`openssl rand -base64 32`）
+- 可选 `SERVER_PORT`（默认 `22`）、`SERVER_APP_DIR`（默认 `~/zero-player`）、`BETTER_AUTH_URL`、`AGENT_TOKEN_TTL_DAYS`、`DATABASE_URL`
+
+也可以手动在服务器上部署：把仓库放到目标目录后执行 `BETTER_AUTH_SECRET=... bash scripts/deploy.sh`。
 
 ## 🚪 Room System
 
@@ -123,14 +145,13 @@ routes. The MCP layer resolves the current session to a room id through
 `server/mcp/utils/current-room.ts`, then uses that id with the standard
 `/api/rooms/:id/*` endpoints.
 
-Room state is persisted in NuxtHub KV, so it survives cold starts and is shared
-across serverless instances. Anonymous identities live in the NuxtHub database
-(SQLite locally, D1 on Cloudflare) via Better Auth; login mints a short opaque
+Room state is persisted in file-backed NuxtHub KV (`.data/kv`), so it survives
+restarts on the single server. Anonymous identities live in the local SQLite
+database (`.data/db/sqlite.db`) via Better Auth; login mints a short opaque
 token in the same database, and stateful REST routes authenticate with
-`Authorization: Bearer <token>`. Real-time fanout still uses in-process
-WebSocket listeners locally; on Cloudflare the room store forwards updates to
-the Nitro WebSocket Durable Object so browser peers receive them across
-isolates.
+`Authorization: Bearer <token>`. Real-time fanout uses in-process WebSocket
+listeners: every room mutation emits directly to the WS peers in the same Node
+process.
 
 ### Game registry
 
@@ -209,9 +230,9 @@ Rooms close themselves, so the lobby never accumulates stale entries:
 - `waiting` rooms close after 1 hour without activity, `playing` rooms are
   aborted (no winner, `aborted` status) after 1 hour without a move, and
   terminal (`finished`/`aborted`) rooms are deleted 10 minutes after they end.
-- The `rooms:cleanup` Nitro task (every minute) enforces these deadlines and
-  broadcasts deletions; the room's kv TTL is a backstop if the task is not
-  scheduled on the deployed platform.
+- The `rooms:cleanup` Nitro task (every 5 minutes) enforces these deadlines and
+  broadcasts deletions; on the single Node server the task is the primary
+  expiry mechanism.
 - The host can close a room explicitly via `POST /api/rooms/:id/close` (or the
   `close-room` MCP tool, user-confirmed): waiting/terminal rooms are deleted
   immediately, a running game is aborted.
@@ -232,8 +253,8 @@ room retention window and are never deleted. Each archived game keeps:
 - **Every move** – coordinates, human notation (`H8`), the player's side and
   the AI-provided `reason` explaining the move
 
-Storage is SQLite locally (`.data/db/sqlite.db`, migrations applied
-automatically on dev start) and Cloudflare D1 when deployed on NuxtHub. The
+Storage is a local SQLite file (`.data/db/sqlite.db`). Migrations are applied
+automatically on dev start and by a startup plugin in production Docker. The
 schema lives in `server/db/schema.ts` with migrations under
 `server/db/migrations/`; regenerate them with `npx nuxt db generate`.
 

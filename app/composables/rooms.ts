@@ -26,11 +26,10 @@ function parseSocketData(data: unknown): Promise<string> {
 const FALLBACK_POLL_INTERVAL_MS = 5000
 
 /**
- * While the WebSocket feed is down (Durable Object hiccups on Cloudflare,
- * stale deploys, ...), poll the REST endpoint on a short interval so the
- * page keeps updating even if the WS bridge fails entirely. The poller
- * starts when the socket is disconnected and stops as soon as it reconnects
- * or the feed reaches a terminal state.
+ * While the WebSocket feed is temporarily unavailable, poll the REST endpoint
+ * on a short interval so the page keeps updating. The poller starts when the
+ * socket is disconnected and stops as soon as it reconnects or the feed
+ * reaches a terminal state.
  */
 function watchFallbackPolling(connected: Ref<boolean>, poll: () => void, shouldStop?: () => boolean): void {
   let timer: ReturnType<typeof setInterval> | null = null
@@ -91,8 +90,8 @@ export async function useRoomListFeed() {
     },
   })
 
-  // While the WebSocket is down (Durable Object hiccups on Cloudflare, stale
-  // deploys, ...), keep the lobby fresh by polling the REST endpoint instead.
+  // While the WebSocket is down, keep the lobby fresh by polling the REST
+  // endpoint instead.
   watchFallbackPolling(connected, () => {
     refresh().catch(() => {})
   })

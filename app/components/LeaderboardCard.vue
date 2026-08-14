@@ -49,9 +49,9 @@ const dimensionOptions = [
 const { data, pending, error, refresh } = await useFetch<LeaderboardResponse>(
   '/api/leaderboard',
   {
-    // The home page is prerendered at build time, where the D1 binding is not
-    // available. Fetching on the client keeps the leaderboard live and avoids
-    // baking a build-time 500 into the static page.
+    // The home page is prerendered at build time, before the runtime database
+    // is available. Fetching on the client keeps the leaderboard live and
+    // avoids baking a build-time 500 into the static page.
     server: false,
     query: computed(() => ({
       gameId: gameFilter.value === 'all' ? undefined : gameFilter.value,

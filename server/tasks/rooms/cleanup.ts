@@ -3,8 +3,8 @@ import { sweepExpiredRooms } from '../../utils/room-store'
 
 /**
  * Closes rooms past their `closesAt` deadline: running games are aborted
- * first (timeout), then terminal rooms are deleted and broadcast. kv TTL is
- * the backstop in case this task is not scheduled on the deployed platform.
+ * first (timeout), then terminal rooms are deleted and broadcast. On the
+ * single Node server this scheduled task is the primary expiry mechanism.
  * Expired login tokens are purged in the same sweep.
  */
 export default defineTask({

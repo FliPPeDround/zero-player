@@ -25,7 +25,6 @@ const SESSION_INDEX_TTL_SECONDS = 60 * 60 * 24 * 7
 const ROOM_LIST_CACHE_TTL_MS = 10_000
 const listListeners = new Set<ListListener>()
 const detailListeners = new Map<string, Set<DetailListener>>()
-const latestRoomSnapshots = new Map<string, Room>()
 const spectatorCounts = new Map<string, number>()
 const gameMoveQueues = new Map<string, Promise<unknown>>()
 let roomListCache: { rooms: RoomSummary[], builtAt: number } | null = null
@@ -34,33 +33,12 @@ const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
 const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
 const TERMINAL_RETENTION_MS = envMs('ROOMS_TERMINAL_RETENTION_MS', 10 * 60 * 1000)
 const KV_TTL_MAX_SECONDS = 60 * 60 * 24 * 7
-const DURABLE_BINDING_NAME = '$DurableObject'
-const DURABLE_INSTANCE_NAME = 'server'
 
 let eventCounter = 0
-
-export interface RoomHubBroadcast {
-  roomId: string
-  list: RoomUpdateListMessage
-  detail: RoomDetailSocketMessage
-}
 
 export type RoomUpdateListMessage
   = { type: 'created' | 'updated', room: RoomSummary }
     | { type: 'deleted', room: RoomSummary }
-
-interface DurableObjectStub {
-  fetch: (request: Request) => Promise<Response>
-}
-
-interface DurableObjectBinding {
-  idFromName: (name: string) => unknown
-  get: (id: unknown) => DurableObjectStub
-}
-
-type DurableGlobal = typeof globalThis & {
-  __env__?: Record<string, unknown>
-}
 
 function envMs(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -111,9 +89,9 @@ function emitList(type: 'created' | 'updated' | 'deleted', room: Room | RoomSumm
 }
 
 /**
- * Keep the in-isolate lobby cache in sync with the update feed. The cache is
- * only a read-avoidance layer: it expires after a few seconds, so rooms
- * created/deleted in other isolates are picked up on the next full KV scan.
+ * Keep the in-process lobby cache in sync with the update feed. The cache is
+ * only a read-avoidance layer: it expires after a few seconds, so a cold
+ * reload picks up the next full KV scan.
  */
 function updateRoomListCache(type: 'created' | 'updated' | 'deleted', room: RoomSummary): void {
   if (!roomListCache)
@@ -138,93 +116,6 @@ function emitDetail(roomId: string, message: RoomDetailSocketMessage): RoomDetai
   for (const listener of listeners)
     listener(message)
   return message
-}
-
-/**
- * Resolve the Nitro WebSocket Durable Object stub when running in a regular
- * Cloudflare Worker. WebSocket peers live in `$DurableObject`; room mutations
- * are forwarded into it (see `server/utils/room-durable.ts`) so the mutation
- * and the broadcast happen in the same isolate. Inside the Durable Object
- * itself the stub resolves to null and everything emits locally.
- */
-export function getDurableObjectStub(): DurableObjectStub | null {
-  const g = globalThis as DurableGlobal
-  let env: Record<string, unknown> | undefined
-  try {
-    const event = useEvent()
-    const platform = event.context._platform?.cloudflare as {
-      durableFetch?: (request: Request) => Promise<Response>
-      durable?: unknown
-      env?: Record<string, unknown>
-    } | undefined
-    // Inside the Nitro WebSocket Durable Object itself the peers are local,
-    // so broadcasts are emitted in place and must not be re-forwarded.
-    if (platform?.durable !== undefined)
-      return null
-    const durableFetch = platform?.durableFetch
-    if (typeof durableFetch === 'function')
-      return { fetch: request => durableFetch(request) }
-    // Canonical binding access: works even when the `_platform` plumbing is
-    // missing or the async context was lost after an await.
-    env = platform?.env ?? (event.context.cloudflare as { env?: Record<string, unknown> } | undefined)?.env
-  }
-  catch {
-    // Not inside a Nitro request (e.g. a scheduled task): Nitro keeps the
-    // Cloudflare env on `globalThis.__env__`; fall back to the binding there.
-  }
-  const binding = (env ?? g.__env__)?.[DURABLE_BINDING_NAME] as DurableObjectBinding | undefined
-  if (!binding)
-    return null
-  try {
-    return binding.get(binding.idFromName(DURABLE_INSTANCE_NAME))
-  }
-  catch {
-    return null
-  }
-}
-
-async function broadcastToDurable(payload: RoomHubBroadcast): Promise<void> {
-  const stub = getDurableObjectStub()
-  if (!stub)
-    return
-  try {
-    await stub.fetch(new Request('http://internal/api/internal/ws-broadcast', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    }))
-  }
-  catch (error) {
-    // The room is already persisted and emitted locally; a failed WS bridge
-    // must not fail the request. The Durable Object-side KV poller (see
-    // server/routes/ws/rooms/[id].ts) catches peers up within ~2s.
-    console.error(`[rooms] failed to broadcast room ${payload.roomId} to the WebSocket durable object:`, error)
-  }
-}
-
-/**
- * Re-dispatch a room broadcast inside the Durable Object that owns WebSocket
- * peers. Only the internal WS bridge route should call this.
- */
-export function dispatchRoomHubBroadcast(payload: RoomHubBroadcast): void {
-  if ('room' in payload.detail) {
-    if (payload.detail.type === 'closed')
-      latestRoomSnapshots.delete(payload.roomId)
-    else
-      latestRoomSnapshots.set(payload.roomId, payload.detail.room)
-  }
-  emitList(payload.list.type, payload.list.room)
-  emitDetail(payload.roomId, payload.detail)
-}
-
-/**
- * Latest full room seen by this isolate from the REST→Durable Object bridge.
- * Used by the WebSocket handler for initial snapshots so a client joining
- * mid-game does not briefly get an older KV snapshot that would revert the
- * board it just received.
- */
-export function getLatestRoomSnapshot(roomId: string): Room | null {
-  return latestRoomSnapshots.get(roomId) ?? null
 }
 
 /**
@@ -320,9 +211,8 @@ async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<voi
   room.spectatorCount = spectatorCounts.get(room.id) ?? room.spectatorCount
   const ttl = ttlSecondsUntil(room)
   await kv.set(roomKey(room.id), room, ttl ? { ttl } : undefined)
-  const list = emitList(type, room)
-  const detail = emitDetail(room.id, { type: 'update', room })
-  await broadcastToDurable({ roomId: room.id, list, detail })
+  emitList(type, room)
+  emitDetail(room.id, { type: 'update', room })
 }
 
 async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promise<Room | null> {
@@ -333,9 +223,8 @@ async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promi
   await kv.del(roomKey(roomId))
   spectatorCounts.delete(roomId)
   await clearRoomSessions(room)
-  const list = emitList('deleted', room)
-  const detail = emitDetail(roomId, { type: 'closed', room })
-  await broadcastToDurable({ roomId, list, detail })
+  emitList('deleted', room)
+  emitDetail(roomId, { type: 'closed', room })
   return room
 }
 
@@ -473,10 +362,8 @@ export async function getRoom(roomId: string): Promise<Room | null> {
     // round. Hydrate once so the web timeline can render every round.
     if (room.gameId === 'liar-dice' && room.game) {
       const state = room.game.state as { rounds?: unknown } | undefined
-      if (state && typeof state === 'object' && !Array.isArray(state.rounds)) {
+      if (state && typeof state === 'object' && !Array.isArray(state.rounds))
         room.game = createGameInstance(room).snapshot()
-        latestRoomSnapshots.set(roomId, room)
-      }
     }
   }
   return room
@@ -589,11 +476,10 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
 }
 
 export async function setSpectatorCount(roomId: string, count: number): Promise<void> {
-  const cached = getLatestRoomSnapshot(roomId)
   // Spectator counts are ephemeral UI data, so they deliberately live only in
-  // memory. The Durable Object keeps them for the rooms it has seen; on a cold
-  // start the count starts at the stored value until the next WS open/close.
-  const room = cached ?? await getRoom(roomId)
+  // memory; after a restart the count starts at the stored value until the
+  // next WS open/close.
+  const room = await getRoom(roomId)
   if (!room)
     return
   const normalized = Math.max(0, count)
@@ -648,9 +534,7 @@ export function submitGameMove(
 /**
  * Race games (e.g. 24 Point) let both players submit at the same time. The
  * KV room state is read-modify-write, so submissions are serialized per
- * room. On Cloudflare every room mutation runs inside the single WebSocket
- * Durable Object (see server/utils/room-durable.ts), so this in-process
- * queue is the only writer ordering the store needs.
+ * room.
  */
 function withRoomMoveSerialization<T>(roomId: string, task: () => Promise<T>): Promise<T> {
   const previous = gameMoveQueues.get(roomId) ?? Promise.resolve()
@@ -693,7 +577,8 @@ export async function closeRoom(roomId: string, agent: AgentIdentity): Promise<R
  * Periodic sweep called by the `rooms:cleanup` task. Rooms past their
  * `closesAt` are closed: running games are aborted first (timeout) and enter
  * the terminal retention window; everything else is deleted and broadcast.
- * kv TTL is the backstop in case this task never runs (e.g. serverless).
+ * The scheduled task is the primary expiry mechanism (fs-lite does not apply
+ * TTLs to stored room entries).
  */
 export async function sweepExpiredRooms(): Promise<number> {
   const keys = await kv.keys(ROOM_KEY_PREFIX)

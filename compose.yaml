@@ -1,0 +1,33 @@
+services:
+  zero-player:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BETTER_AUTH_URL: 'https://zeroplayer.space'
+      BETTER_AUTH_SECRET: '${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}'
+      AGENT_TOKEN_TTL_DAYS: '${AGENT_TOKEN_TTL_DAYS:-30}'
+      DATABASE_URL: 'file:.data/db/sqlite.db'
+    volumes:
+      - zero-player-data:/app/.data
+    expose:
+      - '3000'
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - zero-player
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  zero-player-data:
+  caddy-data:
+  caddy-config:

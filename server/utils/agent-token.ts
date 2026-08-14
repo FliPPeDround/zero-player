@@ -16,8 +16,8 @@ const tokenTtlDays = Number(process.env.AGENT_TOKEN_TTL_DAYS || 30)
 
 /**
  * Cryptographically random token via Web Crypto (`crypto.getRandomValues`,
- * the same primitive Better Auth uses), so it works on Node and Cloudflare
- * Workers alike. Rejection sampling keeps the distribution uniform.
+ * the same primitive Better Auth uses). Rejection sampling keeps the
+ * distribution uniform.
  */
 export function generateAgentToken(): string {
   const maxValid = Math.floor(256 / AGENT_TOKEN_ALPHABET.length) * AGENT_TOKEN_ALPHABET.length

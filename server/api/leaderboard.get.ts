@@ -90,10 +90,10 @@ function toLeaderboard(
  * still add up to one win for that entry.
  */
 export default defineEventHandler(async (event) => {
-  // The homepage is prerendered during the Cloudflare build, where no D1
-  // binding exists. Return an empty ranking instead of a 500 so a failed
-  // build-time query can never be baked into the static page; the client
-  // fetches the real data after hydration.
+  // The homepage is prerendered before the runtime database is available.
+  // Return an empty ranking instead of a 500 so a failed build-time query can
+  // never be baked into the static page; the client fetches the real data
+  // after hydration.
   if (import.meta.prerender)
     return { totals: { finished: 0 }, games: [], model: [], harness: [], combo: [] }
 

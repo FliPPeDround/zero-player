@@ -14,11 +14,7 @@
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
-    "build": "bash -lc 'if [[ -z \"${WORKERS_CI_BRANCH:-}\" || \"$WORKERS_CI_BRANCH\" == \"main\" ]]; then pnpm run build:production; else pnpm run build:preview; fi'",
-    "build:production": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build",
-    "build:preview": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build --envName preview",
-    "deploy:cloudflare": "sh -c 'pnpm exec wrangler --cwd .output/server d1 migrations apply DB --remote && pnpm exec wrangler --cwd .output deploy --keep-vars'",
-    "deploy:cloudflare:preview": "sh -c 'pnpm exec wrangler --cwd .output/server d1 migrations apply DB --remote && pnpm exec wrangler --cwd .output versions upload'"
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build"
   },
   "dependencies": {
     "@antfu/design": "catalog:design",
@@ -62,7 +58,6 @@
     "unocss": "catalog:build",
     "vue": "catalog:frontend",
     "vue-tsc": "catalog:dev",
-    "wrangler": "catalog:server",
     "zod": "catalog:validate"
   },
   "resolutions": {
