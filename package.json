@@ -7,7 +7,7 @@
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "prepare": "nuxt prepare && skills-npm",
+    "prepare": "nuxt prepare && (skills-npm || true)",
     "preview": "nuxt preview",
     "rooms:create": "node scripts/create-rooms.mjs",
     "start": "node .output/server/index.mjs",
