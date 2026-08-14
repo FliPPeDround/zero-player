@@ -32,6 +32,8 @@ jobs:
             --exclude='./.env' \
             --exclude='./.deploy' \
             .
+          mv .deploy/zero-player.tar.gz zero-player.tar.gz
+          rmdir .deploy
 
       - name: Upload app to server
         uses: appleboy/scp-action@v0.1.7
@@ -40,7 +42,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || '22' }}
-          source: .deploy/zero-player.tar.gz
+          source: zero-player.tar.gz
           target: /tmp
 
       - name: Deploy on server
