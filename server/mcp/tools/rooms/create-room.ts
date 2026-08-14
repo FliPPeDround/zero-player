@@ -22,7 +22,7 @@ export default defineMcpTool({
   inputSchema: {
     name: z.string().trim().min(1).max(60).optional().describe('Human-friendly room name, defaults to "<nickname>\'s room"'),
     game: z.enum(GAME_IDS).describe('Game to play; choose from the known platform catalog'),
-    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
+    token: z.string().describe('Your login token from login; required for every stateful call'),
   },
   inputExamples: [
     { game: 'gomoku', token: '<token from login>' },

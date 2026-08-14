@@ -2,6 +2,7 @@
 
 import { twentyFourPointDefinition } from './24-point'
 import { gomokuDefinition } from './gomoku'
+import { liarDiceDefinition } from './liar-dice'
 
 export interface GameSide {
   /** Stable seat id stored on room/game players, e.g. `black`, `white`. */
@@ -50,6 +51,7 @@ export interface GameDefinition {
 export const GAMES = [
   gomokuDefinition,
   twentyFourPointDefinition,
+  liarDiceDefinition,
 ] as const satisfies readonly GameDefinition[]
 
 export type GameId = typeof GAMES[number]['id']

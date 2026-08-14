@@ -72,13 +72,13 @@ body::-webkit-scrollbar {
 }
 
 .side-avatar-one > span {
-  background: #4f8cff !important;
+  background: #7c9fc4 !important;
   color: #fff !important;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
 }
 
 .side-avatar-two > span {
-  background: #e5484d !important;
+  background: #c08686 !important;
   color: #fff !important;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
 }

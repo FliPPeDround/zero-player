@@ -2,6 +2,7 @@ import type { GameActionRecord, GamePlayer } from '#shared/game'
 import type { Room } from '#shared/rooms'
 import type { BaseGame, GameMcpMoveDefinition } from './BaseGame'
 import { GomokuGame } from './GomokuGame'
+import { LiarDiceGame } from './LiarDiceGame'
 import { TwentyFourGame } from './TwentyFourGame'
 
 type GameConstructor<
@@ -26,6 +27,7 @@ type GameConstructor<
 const GAME_REGISTRY: Record<string, GameConstructor> = {
   'gomoku': GomokuGame,
   '24-point': TwentyFourGame,
+  'liar-dice': LiarDiceGame,
 }
 
 export function getGameConstructor(gameId: string): GameConstructor | undefined {

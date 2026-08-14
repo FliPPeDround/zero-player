@@ -1,19 +1,14 @@
 <script setup lang="ts">
 import type { GomokuState } from '#shared/gomoku'
-import type { RoomEvent } from '#shared/rooms'
 import { getGame, getGameName } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
 import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
-import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
-import DisplayKeyValue from '@antfu/design/components/Display/DisplayKeyValue.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
-import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import FeedbackLoading from '@antfu/design/components/Feedback/FeedbackLoading.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
-import LayoutSeparator from '@antfu/design/components/Layout/LayoutSeparator.vue'
 
 const route = useRoute()
 const roomId = computed(() => String(route.params.id ?? ''))
@@ -23,7 +18,6 @@ onMounted(open)
 onUnmounted(close)
 
 const gameName = computed(() => room.value ? getGameName(room.value.gameId) : '')
-const gameDescription = computed(() => room.value ? getGame(room.value.gameId)?.description ?? '' : '')
 const gameIcon = computed(() => room.value ? getGame(room.value.gameId)?.icon : '')
 const gameSides = computed(() => room.value ? getGame(room.value.gameId)?.sides ?? [] : [])
 const firstSide = computed(() => gameSides.value[0])
@@ -31,6 +25,7 @@ const secondSide = computed(() => gameSides.value[1])
 const isVersus = computed(() => gameSides.value.length === 2)
 const isGomoku = computed(() => room.value?.gameId === 'gomoku')
 const isTwentyFour = computed(() => room.value?.gameId === '24-point')
+const isLiarDice = computed(() => room.value?.gameId === 'liar-dice')
 
 const turnLabel = computed(() => {
   const game = room.value?.game
@@ -69,66 +64,17 @@ const turnDotClass = computed(() => {
   return 'bg-hover'
 })
 
-const closesInLabel = computed(() => {
-  const at = room.value?.closesAt
-  if (!at)
-    return null
-  const minutes = Math.max(1, Math.ceil((new Date(at).getTime() - Date.now()) / 60_000))
-  return `In ~${minutes}m`
-})
-
 const lastMoveLabel = computed(() => {
-  const state = room.value?.game?.state as GomokuState | undefined
+  const game = room.value?.game
+  if (!game)
+    return ''
+  if (game.gameId === 'liar-dice') {
+    const state = game.state as { lastMoveLabel?: string } | undefined
+    return state?.lastMoveLabel ?? ''
+  }
+  const state = game.state as GomokuState | undefined
   return state?.lastMove ? gomokuMoveLabel(state.lastMove) : ''
 })
-
-function moveLabel(payload: Record<string, unknown>): string {
-  if (payload.type === 'place' && typeof payload.x === 'number' && typeof payload.y === 'number')
-    return gomokuMoveLabel({ x: payload.x, y: payload.y })
-  return ''
-}
-
-const statusMeta = {
-  waiting: { color: 'warning', label: 'Waiting' },
-  playing: { color: 'success', label: 'Playing' },
-  finished: { color: false, label: 'Finished' },
-  aborted: { color: 'error', label: 'Aborted' },
-} as const
-
-const eventMeta: Record<RoomEvent['type'], { label: string, icon: string }> = {
-  player_joined: { label: 'Joined', icon: 'i-carbon-user-follow' },
-  player_left: { label: 'Left', icon: 'i-carbon-user-minus' },
-  game_started: { label: 'Game started', icon: 'i-carbon-play' },
-  move: { label: 'Move', icon: 'i-carbon-move' },
-  game_finished: { label: 'Game finished', icon: 'i-carbon-flag' },
-  game_aborted: { label: 'Game aborted', icon: 'i-carbon-stop-outline' },
-  room_closed: { label: 'Room closed', icon: 'i-carbon-close-outline' },
-}
-
-/**
- * Lifecycle events render as full-width marker bands that split the feed into
- * phases (lobby chatter, moves, result). Everything else is quiet chatter.
- */
-const markerTypes = new Set<RoomEvent['type']>(['game_started', 'game_finished', 'game_aborted'])
-
-/** Score-sheet numbering: `#1`, `#2`, ... counting only move events. */
-const moveNumbers = computed(() => {
-  const numbers = new Map<string, number>()
-  let count = 0
-  for (const event of room.value?.events ?? []) {
-    if (event.type === 'move')
-      numbers.set(event.id, (count += 1))
-  }
-  return numbers
-})
-
-function chatterVerb(event: RoomEvent): string {
-  if (event.type === 'player_joined')
-    return 'joined'
-  if (event.type === 'player_left')
-    return 'left'
-  return eventMeta[event.type].label
-}
 
 const players = computed(() => {
   return room.value?.players ?? []
@@ -141,33 +87,12 @@ const secondPlayer = computed(() => (
   players.value.find(player => player.slot === secondSide.value?.key) ?? null
 ))
 
-/** Every event carries the mover's seat (`payload.side`), so the avatar tint is a direct lookup. */
-function moveAvatarClass(event: RoomEvent): string {
-  const side = event.payload?.side
-  if (typeof side !== 'string')
-    return ''
-  return gameSides.value.find(sideDef => sideDef.key === side)?.avatarClass ?? ''
-}
-
-const winnerDotClass = computed(() => {
-  const winner = players.value.find(player => player.sessionId === room.value?.winner)
-  return gameSides.value.find(side => side.key === winner?.slot)?.dotClass ?? ''
-})
-
 /** `room.winner` is a session id; map it to the nickname for display. */
 const winnerNickname = computed(() => {
   const winner = room.value?.winner
   if (!winner)
     return ''
   return players.value.find(player => player.sessionId === winner)?.nickname ?? ''
-})
-
-const logRef = ref<HTMLElement | null>(null)
-watch(() => room.value?.events.length, () => {
-  nextTick(() => {
-    if (logRef.value)
-      logRef.value.scrollTop = logRef.value.scrollHeight
-  })
 })
 
 useHead({
@@ -237,11 +162,15 @@ useHead({
     <template v-else-if="room">
       <div
         class="gap-4 grid items-stretch"
-        :class="isTwentyFour ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]'"
+        :class="isTwentyFour
+          ? 'lg:grid-cols-1'
+          : isLiarDice
+            ? 'lg:grid-cols-1 lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'
+            : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'"
       >
-        <div class="flex flex-col gap-4 min-w-0">
+        <div class="flex flex-col gap-4 min-w-0 lg:min-h-0 lg:justify-center">
           <section
-            v-if="isVersus && !isGomoku && !isTwentyFour"
+            v-if="isVersus && !isGomoku && !isTwentyFour && !isLiarDice"
             class="gap-3 grid items-stretch md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
           >
             <RoomPlayerCard
@@ -260,7 +189,7 @@ useHead({
               :highlight="room.status === 'finished' && secondPlayer?.sessionId === room.winner"
             />
           </section>
-          <section v-else-if="!isGomoku && !isTwentyFour" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
+          <section v-else-if="!isGomoku && !isTwentyFour && !isLiarDice" class="gap-3 grid items-stretch lg:grid-cols-4 sm:grid-cols-2">
             <RoomPlayerCard
               v-for="(player, index) in players"
               :key="player.sessionId"
@@ -382,176 +311,14 @@ useHead({
           <section v-else-if="isTwentyFour" class="gap-4 grid">
             <TwentyFourBoard :room="room" />
           </section>
+
+          <section v-else-if="isLiarDice" class="flex flex-col min-h-0 min-w-0 lg:flex-1">
+            <LiarDiceBoard :room="room" />
+          </section>
         </div>
 
-        <aside v-if="!isTwentyFour" class="flex flex-col gap-4 min-h-0 min-w-0">
-          <LayoutCard class="flex flex-col gap-3">
-            <LayoutSeparator label="Match info" />
-            <DisplayKeyValue label="Game" :value="gameName" />
-            <p class="text-mini color-muted -mt-1.5">
-              {{ gameDescription }}
-            </p>
-            <DisplayKeyValue label="Status">
-              <DisplayBadge
-                :text="statusMeta[room.status].label"
-                :color="statusMeta[room.status].color"
-              />
-            </DisplayKeyValue>
-            <DisplayKeyValue label="Moves">
-              <span class="flex gap-1.5 items-baseline">
-                <DisplayNumber :value="room.game?.moveCount ?? 0" />
-                <span v-if="lastMoveLabel" class="text-mini color-faint font-mono">
-                  {{ lastMoveLabel }}
-                </span>
-              </span>
-            </DisplayKeyValue>
-            <DisplayKeyValue label="Last activity">
-              <DisplayDate :date="room.updatedAt" :live="room.status === 'playing'" />
-            </DisplayKeyValue>
-            <DisplayKeyValue v-if="room.status === 'finished' && room.winner" label="Winner" :value="winnerNickname" />
-            <DisplayKeyValue
-              v-if="closesInLabel"
-              label="Auto-closes"
-            >
-              <span class="text-mini color-muted">{{ closesInLabel }}</span>
-            </DisplayKeyValue>
-          </LayoutCard>
-
-          <LayoutCard
-            v-if="!isTwentyFour"
-            :padding="false"
-            class="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden"
-          >
-            <div class="px-3 py-2 border-b border-base flex items-center">
-              <div class="flex gap-2 items-center">
-                <h2 class="text-sm font-medium">
-                  Battle log
-                </h2>
-                <DisplayNumberBadge :value="room.events.length" />
-              </div>
-            </div>
-            <div class="lg:flex-1 lg:min-h-0 lg:relative">
-              <div ref="logRef" class="scroll-fade-y h-[420px] overflow-y-auto lg:h-auto lg:inset-0 lg:absolute">
-                <ol v-if="room.events.length" class="py-1">
-                  <li
-                    v-for="event in room.events"
-                    :key="event.id"
-                    class="first:border-t-0"
-                    :class="{ 'border-t border-mute': markerTypes.has(event.type) }"
-                  >
-                    <!-- Move: identity and move share one header line; the reason sits below -->
-                    <div
-                      v-if="event.type === 'move' && event.payload"
-                      class="px-3 py-2 flex gap-2.5"
-                    >
-                      <DisplayAvatar
-                        :name="event.actor ?? eventMeta.move.label"
-                        :size="22"
-                        class="mt-0.5 shrink-0"
-                        :class="[moveAvatarClass(event)]"
-                      />
-                      <div class="flex-1 min-w-0">
-                        <div class="flex gap-x-1.5 min-w-0 items-center">
-                          <span class="text-compact color-base font-medium min-w-0 truncate">
-                            {{ event.actor ?? eventMeta.move.label }}
-                          </span>
-                          <span class="text-mini color-faint shrink-0" aria-hidden="true">·</span>
-                          <DisplayNumberBadge
-                            :value="moveNumbers.get(event.id) ?? 0"
-                            prefix="#"
-                            class="shrink-0"
-                          />
-                          <template v-if="event.payload.type === 'place'">
-                            <span class="text-sm color-base font-medium font-mono shrink-0">
-                              {{ moveLabel(event.payload) }}
-                            </span>
-                          </template>
-                          <template v-else>
-                            <span class="text-sm color-base font-medium font-mono shrink-0">
-                              {{ event.payload.expression ?? event.payload.move }}
-                            </span>
-                          </template>
-                          <span class="flex-1" aria-hidden="true" />
-                          <DisplayDate
-                            :date="event.at"
-                            :live="room.status === 'playing'"
-                            class="text-mini color-faint shrink-0"
-                          />
-                        </div>
-                        <div
-                          v-if="event.payload.type === 'answer'"
-                          class="text-mini color-muted font-mono mt-0.5 tabular-nums"
-                        >
-                          Q{{ event.payload.question ?? '?' }} ·
-                          {{ event.payload.correct ? 'Correct' : 'Wrong' }}
-                          <template v-if="typeof event.payload.feedback === 'string' && event.payload.feedback">
-                            · {{ event.payload.feedback }}
-                          </template>
-                        </div>
-                        <p
-                          v-if="typeof event.payload.reason === 'string' && event.payload.reason"
-                          class="text-compact color-muted mt-1 pl-2 border-l border-mute whitespace-pre-wrap break-words"
-                        >
-                          {{ event.payload.reason }}
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Lifecycle markers: quiet bands that split the feed into phases -->
-                    <div
-                      v-else-if="markerTypes.has(event.type)"
-                      class="text-compact px-3 py-1.5 bg-secondary flex gap-2.5 items-center"
-                    >
-                      <span class="color-muted flex shrink-0 w-[22px] justify-center" aria-hidden="true">
-                        <span :class="eventMeta[event.type].icon" />
-                      </span>
-                      <p class="color-muted flex-1 min-w-0 truncate">
-                        <template v-if="event.type === 'game_finished'">
-                          <span
-                            v-if="winnerDotClass"
-                            class="mr-1 rounded-full h-2 w-2 inline-block"
-                            :class="winnerDotClass"
-                            aria-hidden="true"
-                          />
-                          <span class="color-base font-medium">{{ winnerNickname ? `${winnerNickname} won` : 'Draw' }}</span>
-                          <span v-if="room.game?.finishReason" class="text-mini color-faint font-mono"> · {{ room.game.finishReason }}</span>
-                        </template>
-                        <template v-else>
-                          {{ eventMeta[event.type].label }}
-                        </template>
-                      </p>
-                      <DisplayDate
-                        :date="event.at"
-                        :live="room.status === 'playing'"
-                        class="text-mini color-faint shrink-0"
-                      />
-                    </div>
-                    <!-- Chatter: joins/leaves recede to faint one-liners -->
-                    <div
-                      v-else
-                      class="text-mini px-3 py-1 flex gap-2.5 items-center"
-                    >
-                      <span class="op-fade flex shrink-0 w-[22px] justify-center" aria-hidden="true">
-                        <span :class="eventMeta[event.type].icon" />
-                      </span>
-                      <p class="color-muted flex-1 min-w-0 truncate">
-                        <span v-if="event.actor" class="color-base font-medium">{{ event.actor }}</span> {{ chatterVerb(event) }}
-                      </p>
-                      <DisplayDate
-                        :date="event.at"
-                        :live="room.status === 'playing'"
-                        class="color-faint shrink-0"
-                      />
-                    </div>
-                  </li>
-                </ol>
-                <FeedbackEmptyState
-                  v-else
-                  icon="i-carbon-activity"
-                  title="No events yet"
-                />
-              </div>
-            </div>
-          </LayoutCard>
+        <aside v-if="!isTwentyFour && !isLiarDice" class="flex flex-col gap-4 min-h-0 min-w-0">
+          <RoomBattleLog :room="room" :winner-nickname="winnerNickname" />
         </aside>
       </div>
     </template>

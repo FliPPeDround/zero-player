@@ -27,6 +27,22 @@ function gomokuMessage(room: Room, userId: string, phase: 'started' | 'running')
   return `${prefix} You are white (O); waiting for black's move. Run the returned watchCommand (Windows: watchCommandWindows), then call make-gomoku-move when it is your turn.`
 }
 
+function liarDiceMessage(room: Room, userId: string, phase: 'started' | 'running'): string {
+  const prefix = phase === 'started' ? 'Game started.' : 'Game is already running.'
+  const isMyTurn = room.status === 'playing' && room.game?.currentPlayerId === userId
+  const state = room.game?.state as { currentBid?: unknown } | undefined
+
+  if (isMyTurn) {
+    const opening = !state?.currentBid
+    const example = opening
+      ? '{ type: \'bid\', call: \'3x4\' }'
+      : '{ type: \'raise\', call: \'5x6\' } or { type: \'call\' }'
+    return `${prefix} ${opening ? 'You open the bidding' : 'It is your turn'} — call make-liar-dice-move now, e.g. ${example}.`
+  }
+
+  return `${prefix} Waiting for the opponent. Run the returned watchCommand (Windows: watchCommandWindows), then call make-liar-dice-move when it is your turn.`
+}
+
 function startedMessage(room: Room, userId: string): string {
   if (room.gameId === 'gomoku')
     return gomokuMessage(room, userId, 'started')
@@ -35,6 +51,9 @@ function startedMessage(room: Room, userId: string): string {
     const challenge = renderTwentyFourChallenge(room.game.state as TwentyFourState, userId)
     return `Game started. ${challenge}. Call make-24-point-move now to answer.`
   }
+
+  if (room.gameId === 'liar-dice')
+    return liarDiceMessage(room, userId, 'started')
 
   return `Game started — ${getGameName(room.gameId)}.`
 }
@@ -48,13 +67,16 @@ function runningMessage(room: Room, userId: string): string {
     return `Game is already running. ${challenge}. Call make-24-point-move now to answer.`
   }
 
+  if (room.gameId === 'liar-dice')
+    return liarDiceMessage(room, userId, 'running')
+
   return `Game ${room.id} is already running.`
 }
 
 export default defineMcpTool({
   group: 'rooms',
   name: 'start-game',
-  description: 'Start the game in your current room once it is full. Any player in the room can start; it is the mandatory pre-game step for every game. Returns immediately with a compact room summary (id, name, gameId, status, playerCount, maxPlayers) plus game-specific state: Gomoku black gets the board and is told to call make-gomoku-move, Gomoku white gets watchCommand/watchCommandWindows to wait for its turn, and 24 Point gets the first question and is told to call make-24-point-move. If the room is not full it also returns a watchCommand.',
+  description: 'Start the game in your current room once it is full. Any player in the room can start; it is the mandatory pre-game step for every game. Returns immediately with a compact room summary (id, name, gameId, status, playerCount, maxPlayers) plus game-specific state: Gomoku black gets the board and is told to call make-gomoku-move, Gomoku white gets watchCommand/watchCommandWindows to wait for its turn, 24 Point gets the first question and is told to call make-24-point-move, and Liar\'s Dice tells the opener to make the first bid while the other player gets watchCommand/watchCommandWindows. If the room is not full it also returns a watchCommand.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -62,7 +84,7 @@ export default defineMcpTool({
     openWorldHint: false,
   },
   inputSchema: {
-    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
+    token: z.string().describe('Your login token from login; required for every stateful call'),
   },
   inputExamples: [
     { token: '<token from login>' },
@@ -85,9 +107,10 @@ export default defineMcpTool({
     const presentStarted = (room: Room, message: string): Record<string, unknown> => {
       const base = { message, ...present(room) }
       const shouldWatch = room.status === 'playing'
-        && room.gameId === 'gomoku'
-        && playerSide(room, userId) !== 'black'
         && room.game?.currentPlayerId !== userId
+        && (room.gameId === 'gomoku'
+          ? playerSide(room, userId) !== 'black'
+          : room.gameId === 'liar-dice')
       return shouldWatch
         ? {
             ...base,

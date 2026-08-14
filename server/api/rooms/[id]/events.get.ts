@@ -21,7 +21,8 @@ function isTerminal(room: Room): boolean {
 
 /**
  * Public SSE stream of one room's real-time state, consumed by the watcher
- * scripts (`watch-room.sh` / `watch-room.ps1`).
+ * scripts (`watch-room.sh` / `watch-room.ps1`), which poll this endpoint
+ * with short-lived connections and read the initial snapshot of each poll.
  *
  * While the room is waiting this stream stays compact: an initial snapshot
  * with only the player count / `ready` flag, then `joined` / `left` events
@@ -33,9 +34,9 @@ function isTerminal(room: Room): boolean {
  * payload as the `make-<game>-move` tools (yourSide, currentPlayer,
  * moveNumber, lastMove / challenge, board). For Gomoku, when `currentPlayer`
  * becomes `you` the stream sends "call make-gomoku-move now" and closes;
- * other games stream compact state until the game ends. Spectators without a
- * token keep the sanitized full room view (no opponent move reasons, no raw
- * coordinate board).
+ * Liar's Dice wakes its player the same way. Other games stream compact state
+ * until the game ends. Spectators without a token keep the sanitized full room
+ * view (no opponent move reasons, no raw coordinate board, no hidden hands).
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -125,6 +126,8 @@ export default defineEventHandler(async (event) => {
       return 'Waiting for the opponent\'s move.'
     if (room.gameId === '24-point')
       return 'Game is running. Call make-24-point-move now to answer.'
+    if (room.gameId === 'liar-dice')
+      return 'Waiting for the opponent\'s bid.'
     return 'Game is running.'
   }
 

@@ -112,5 +112,11 @@ function moveNotation(gameId: string, action: GameActionRecord): string | null {
     return gomokuMoveLabel({ x: action.x, y: action.y })
   if (gameId === '24-point' && typeof action.expression === 'string' && action.expression.trim())
     return action.expression.trim()
+  if (gameId === 'liar-dice') {
+    if (action.type === 'bid' && typeof action.count === 'number' && typeof action.face === 'number')
+      return `${action.count}x${action.face}`
+    if (action.type === 'call')
+      return 'call'
+  }
   return null
 }

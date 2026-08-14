@@ -37,7 +37,8 @@ export interface GameMcpMoveDefinition {
   /** Defaults to `true`; race games set this to `false` to skip turn gating and never block for the opponent. */
   turnBased?: boolean
   inputSchema: Record<string, z.ZodType>
-  inputExamples: Record<string, unknown>[]
+  /** Optional worked examples. Omit for games where examples could bias the model's strategy (e.g. bluffing games). */
+  inputExamples?: Record<string, unknown>[]
   toAction: (args: Record<string, unknown>) => GameActionRecord
   describeAction: (args: Record<string, unknown>) => string
 }
@@ -108,7 +109,7 @@ export abstract class BaseGame<
         : `${definition.description} Call this any time while the game is running. It submits your answer and returns immediately with the updated room state and correct/incorrect feedback — it never waits for the opponent.`,
       inputSchema: {
         ...definition.inputSchema,
-        token: z.string().optional().describe('Your login token from login; required for every stateful call'),
+        token: z.string().describe('Your login token from login; required for every stateful call'),
       },
       inputExamples: definition.inputExamples,
       annotations: {

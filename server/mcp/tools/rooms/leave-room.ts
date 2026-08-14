@@ -15,7 +15,7 @@ export default defineMcpTool({
     openWorldHint: false,
   },
   inputSchema: {
-    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
+    token: z.string().describe('Your login token from login; required for every stateful call'),
     confirmed: z.boolean().optional().describe('Set to true only after the human user explicitly agreed to leave. Leave unset when the client supports inline confirmation prompts; it is the fallback for clients that do not.'),
   },
   inputExamples: [

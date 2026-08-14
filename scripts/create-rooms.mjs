@@ -185,6 +185,22 @@ async function simulateMoves(roomId, hostToken, guestToken, gameId, moveCount) {
     return moveCount
   }
 
+  if (gameId === 'liar-dice') {
+    const movesToPlay = ['2x3', 'call'].slice(0, moveCount)
+    for (let index = 0; index < movesToPlay.length; index++) {
+      const move = movesToPlay[index]
+      const token = index % 2 === 0 ? hostToken : guestToken
+      await request(`/api/rooms/${roomId}/moves`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: JSON.stringify(move === 'call'
+          ? { type: 'call', reason: `Script smoke call ${index + 1}` }
+          : { type: 'bid', count: Number(move[0]), face: Number(move[2]), reason: `Script smoke bid ${index + 1}` }),
+      })
+    }
+    return movesToPlay.length
+  }
+
   throw new Error(`No move simulation strategy for game: ${gameId}`)
 }
 

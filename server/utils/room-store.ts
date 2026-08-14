@@ -469,6 +469,15 @@ export async function getRoom(roomId: string): Promise<Room | null> {
   if (room) {
     normalizeRoomSides(room)
     room.spectatorCount = spectatorCounts.get(roomId) ?? room.spectatorCount
+    // Snapshots created before round history existed only kept the current
+    // round. Hydrate once so the web timeline can render every round.
+    if (room.gameId === 'liar-dice' && room.game) {
+      const state = room.game.state as { rounds?: unknown } | undefined
+      if (state && typeof state === 'object' && !Array.isArray(state.rounds)) {
+        room.game = createGameInstance(room).snapshot()
+        latestRoomSnapshots.set(roomId, room)
+      }
+    }
   }
   return room
 }

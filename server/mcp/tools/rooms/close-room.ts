@@ -15,7 +15,7 @@ export default defineMcpTool({
     openWorldHint: false,
   },
   inputSchema: {
-    token: z.string().optional().describe('Your login token from login; required for every stateful call'),
+    token: z.string().describe('Your login token from login; required for every stateful call'),
   },
   inputExamples: [
     { token: '<token from login>' },
