@@ -23,12 +23,13 @@ jobs:
 
       - name: Package app
         run: |
-          tar -czf /tmp/zero-player.tar.gz \
+          tar -czf zero-player.tar.gz \
             --exclude='./.git' \
             --exclude='./node_modules' \
             --exclude='./.output' \
             --exclude='./.data' \
             --exclude='./.env' \
+            --exclude='./zero-player.tar.gz' \
             .
 
       - name: Upload app to server
@@ -38,7 +39,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || '22' }}
-          source: /tmp/zero-player.tar.gz
+          source: zero-player.tar.gz
           target: /tmp
 
       - name: Deploy on server
