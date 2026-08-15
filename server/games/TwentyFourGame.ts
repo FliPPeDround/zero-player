@@ -39,10 +39,13 @@ const OPERATOR_MAP: Record<string, Operator> = {
 }
 
 /**
- * 24 Point race game. Both players work through the same three puzzles
- * independently; the first player to submit three correct expressions wins.
- * Wrong or malformed answers are accepted as attempts and only produce
- * feedback, so there is no penalty and no turn-based blocking.
+ * 24 Point race game. Both players work through the same six puzzles
+ * independently. Because MCP cannot push the questions to both agents at the
+ * same moment, each player's clock starts when THEY call `start-game` and the
+ * match ends only once BOTH players have solved all six puzzles — the winner
+ * is the player with the shortest personal elapsed time, not necessarily the
+ * first to finish. Wrong or malformed answers are accepted as attempts and
+ * only produce feedback, so there is no penalty and no turn-based blocking.
  */
 export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> {
   readonly gameId = twentyFourPointDefinition.id
@@ -99,6 +102,7 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
       puzzles: this.puzzles.map(puzzle => [...puzzle]),
       progress: {},
       attempts: {},
+      playerStarts: { ...this.playerStarts },
     }
   }
 
@@ -119,6 +123,9 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
     const puzzle = state.puzzles[current] ?? []
     const check = checkExpression(action.expression, puzzle)
     const nextProgress = check.correct ? Math.min(current + 1, state.puzzles.length) : current
+    const finishedAt = { ...(state.finishedAt ?? {}) }
+    if (check.correct && nextProgress >= state.puzzles.length && !finishedAt[playerId])
+      finishedAt[playerId] = new Date().toISOString()
 
     return {
       ...state,
@@ -130,6 +137,7 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
         ...state.attempts,
         [playerId]: (state.attempts[playerId] ?? 0) + 1,
       },
+      finishedAt,
       lastResult: {
         playerId,
         question: Math.min(current + 1, state.puzzles.length),
@@ -145,13 +153,36 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
     _history: PlayedAction<TwentyFourAction>[],
     players: GamePlayer[],
   ): GameResult | null {
-    const winner = players.find(player => (state.progress[player.sessionId] ?? 0) >= state.puzzles.length)
-    if (!winner)
+    const total = state.puzzles.length
+    // The race only ends when every player has finished all questions, so
+    // their personal times are comparable.
+    const completed = players.filter(player =>
+      (state.progress[player.sessionId] ?? 0) >= total
+      && typeof state.finishedAt?.[player.sessionId] === 'string',
+    )
+    if (completed.length < players.length)
       return null
+
+    const elapsedMs: Record<string, number> = {}
+    for (const player of players) {
+      const start = new Date(state.playerStarts[player.sessionId] ?? '').getTime()
+      const end = new Date(state.finishedAt?.[player.sessionId] ?? '').getTime()
+      elapsedMs[player.sessionId] = Number.isFinite(start) && Number.isFinite(end)
+        ? Math.max(0, end - start)
+        : Number.POSITIVE_INFINITY
+    }
+    const best = Math.min(...players.map(player => elapsedMs[player.sessionId] ?? Number.POSITIVE_INFINITY))
+    const fastest = players.filter(player => elapsedMs[player.sessionId] === best)
+    const winner = fastest.length === 1 ? fastest[0]!.sessionId : undefined
     return {
-      winner: winner.sessionId,
+      winner,
       reason: 'all-questions-solved',
-      details: { puzzles: state.puzzles },
+      details: {
+        puzzles: state.puzzles,
+        readyAt: state.playerStarts,
+        finishedAt: state.finishedAt,
+        elapsedMs,
+      },
     }
   }
 
@@ -173,7 +204,7 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
 
   protected override recomputeState(): void {
     const puzzles = this.state.puzzles.map(puzzle => [...puzzle])
-    this.state = { puzzles, progress: {}, attempts: {} }
+    this.state = { puzzles, progress: {}, attempts: {}, playerStarts: { ...this.playerStarts } }
     for (const { action, playerId } of this.history)
       this.state = this.applyAction(this.state, action, playerId)
   }

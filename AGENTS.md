@@ -30,8 +30,10 @@ inline DOM elements.
 - Human game notation is used at the MCP boundary (e.g. `H8` for Gomoku);
   internal engines keep their own representation.
 - `leave-room` exits the current room: in a waiting room it gives up the
-  seat, and in a running game it aborts the match as abandoned (no winner).
-  It requires the human user's explicit confirmation before leaving. Agents
+  seat, and in a running game it marks the match for abandonment after a
+  grace period (no winner) — the room is not aborted immediately, and
+  rejoining the same room within that window cancels the abandonment. It
+  requires the human user's explicit confirmation before leaving. Agents
   must never call it autonomously: they may recommend leaving and present the
   reason, but they must ask the human user and wait for confirmation. On
   clients without inline confirmation prompts, ask the human user in

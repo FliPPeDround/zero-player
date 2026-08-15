@@ -79,6 +79,13 @@ export abstract class BaseGame<
   readonly turnBased: boolean = true
 
   protected readonly players: GamePlayer[]
+  /**
+   * Session id -> ISO time each player started their personal race clock
+   * (their `start-game` call). Race games such as 24 Point compare elapsed
+   * personal times to pick the winner, since MCP cannot broadcast the start
+   * to both agents simultaneously.
+   */
+  protected readonly playerStarts: Record<string, string>
   protected state: TState
   protected history: PlayedAction<TAction>[] = []
 
@@ -87,9 +94,10 @@ export abstract class BaseGame<
   private _finishReason?: string
   private _finishDetails?: Record<string, unknown>
 
-  constructor(roomId: string, players: GamePlayer[]) {
+  constructor(roomId: string, players: GamePlayer[], playerStarts: Record<string, string> = {}) {
     this.roomId = roomId
     this.players = players.map(player => ({ ...player }))
+    this.playerStarts = { ...playerStarts }
     this.state = this.createInitialState()
   }
 
@@ -159,7 +167,7 @@ export abstract class BaseGame<
           const watchCommand = getWatchCommand(room.id, token)
           const watchCommandWindows = getWindowsWatchCommand(room.id, token)
           const message = room.status === 'waiting'
-            ? `The game has not started. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when the room is full, then call start-game and ${definition.toolName} when it is your turn.`
+            ? `The game has not started. Once the room is full, call start-game to mark yourself ready — the game starts only after every player has called it. Until then, run the returned watchCommand (Windows: watchCommandWindows) to be notified when the game starts / it is your turn, then call ${definition.toolName}.`
             : `It is not your turn yet. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when it is your turn, then call ${definition.toolName}.`
           return echo({
             message,
@@ -181,7 +189,7 @@ export abstract class BaseGame<
           const payload = lastEvent?.type === 'move' ? (lastEvent.payload ?? {}) : {}
           const state = updatedRoom.game?.state as { progress?: Record<string, number>, puzzles?: unknown[] } | undefined
           const solved = state?.progress?.[userId] ?? 0
-          const total = state?.puzzles?.length ?? 3
+          const total = state?.puzzles?.length ?? 6
           const question = typeof payload.question === 'number' ? payload.question : Math.min(solved + 1, total)
           const feedback = typeof payload.feedback === 'string' && payload.feedback.trim()
             ? payload.feedback

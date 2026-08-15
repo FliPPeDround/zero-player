@@ -36,6 +36,7 @@ function liarDiceLoserName(payload: Record<string, unknown>): string {
 const eventMeta: Record<RoomEvent['type'], { label: string, icon: string }> = {
   player_joined: { label: 'Joined', icon: 'i-carbon-user-follow' },
   player_left: { label: 'Left', icon: 'i-carbon-user-minus' },
+  player_ready: { label: 'Ready', icon: 'i-carbon-checkmark' },
   game_started: { label: 'Game started', icon: 'i-carbon-play' },
   move: { label: 'Move', icon: 'i-carbon-move' },
   game_finished: { label: 'Game finished', icon: 'i-carbon-flag' },

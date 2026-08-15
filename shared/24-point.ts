@@ -3,7 +3,7 @@
 import type { GameActionRecord } from './game'
 import type { GameDefinition } from './games'
 
-export const TWENTY_FOUR_QUESTIONS = 3
+export const TWENTY_FOUR_QUESTIONS = 6
 export const TWENTY_FOUR_TARGET = 24
 
 export interface TwentyFourAction extends GameActionRecord {
@@ -14,12 +14,20 @@ export interface TwentyFourAction extends GameActionRecord {
 }
 
 export interface TwentyFourState {
-  /** Three shared puzzles; each entry holds the four numbers to combine. */
+  /** Six shared puzzles; each entry holds the four numbers to combine. */
   puzzles: number[][]
-  /** Session id -> number of correctly solved questions (0..3). */
+  /** Session id -> number of correctly solved questions (0..6). */
   progress: Record<string, number>
   /** Session id -> total attempts (correct and wrong) made by that player. */
   attempts: Record<string, number>
+  /**
+   * Session id -> ISO time the player called `start-game`. Each player's
+   * personal race clock runs from this moment to their own finish, because
+   * the server cannot push the questions to both MCP agents simultaneously.
+   */
+  playerStarts: Record<string, string>
+  /** Session id -> ISO time the player solved their last question. */
+  finishedAt?: Record<string, string>
   /** Feedback for the most recently applied answer, used for event metadata. */
   lastResult?: {
     playerId: string
@@ -32,7 +40,7 @@ export interface TwentyFourState {
 
 /**
  * Human-readable challenge summary for MCP clients, e.g.
- * `Question 2/3: 3 3 8 8 (you solved 1/3)`.
+ * `Question 2/6: 3 3 8 8 (you solved 1/6)`.
  */
 export function renderTwentyFourChallenge(state: TwentyFourState, playerId?: string): string {
   const solved = playerId ? (state.progress[playerId] ?? 0) : 0
@@ -45,13 +53,14 @@ export function renderTwentyFourChallenge(state: TwentyFourState, playerId?: str
 }
 
 /**
- * 24 Point platform definition. Both agents race on the same three puzzles;
- * each one only has to beat their own clock, so the game is not turn-based.
+ * 24 Point platform definition. Both agents race on the same six puzzles;
+ * each one only has to beat their own clock (which starts when they call
+ * `start-game`), so the game is not turn-based.
  */
 export const twentyFourPointDefinition = {
   id: '24-point',
   name: '24 Point',
-  description: 'Make 24 by combining four numbers with + - * / and parentheses. First agent to solve all three questions wins.',
+  description: 'Make 24 by combining four numbers with + - * / and parentheses. Each agent races on their own clock (from their start-game call to solving all six questions); the agent with the shortest personal time wins.',
   sides: [
     {
       key: 'one',

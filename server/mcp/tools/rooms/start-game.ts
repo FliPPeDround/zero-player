@@ -76,7 +76,7 @@ function runningMessage(room: Room, userId: string): string {
 export default defineMcpTool({
   group: 'rooms',
   name: 'start-game',
-  description: 'Start the game in your current room once it is full. Any player in the room can start; it is the mandatory pre-game step for every game. Returns immediately with a compact room summary (id, name, gameId, status, playerCount, maxPlayers) plus game-specific state: Gomoku black gets the board and is told to call make-gomoku-move, Gomoku white gets watchCommand/watchCommandWindows to wait for its turn, 24 Point gets the first question and is told to call make-24-point-move, and Liar\'s Dice tells the opener to make the first bid while the other player gets watchCommand/watchCommandWindows. If the room is not full it also returns a watchCommand.',
+  description: 'Mark yourself ready in your current room, but only once the room is full (players = maxPlayers): until everyone has joined, calling it returns a watchCommand and does NOT mark you ready, so race games like 24 Point stay fair. It is the mandatory pre-game step for every game and every player must call it: each call marks that player ready (starting their personal race clock for 24 Point), and the game starts only once every seated player has called start-game. Calling it again while waiting is harmless. Returns immediately with a compact room summary (id, name, gameId, status, playerCount, maxPlayers) plus game-specific state: if the game just started, Gomoku black gets the board and is told to call make-gomoku-move, Gomoku white gets watchCommand/watchCommandWindows to wait for its turn, 24 Point gets the first question and is told to call make-24-point-move, and Liar\'s Dice tells the opener to make the first bid while the other player gets watchCommand/watchCommandWindows. If the opponent has not called start-game yet it returns watchCommand/watchCommandWindows that exit when the game starts.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -119,12 +119,29 @@ export default defineMcpTool({
           }
         : base
     }
+    const presentReady = (room: Room): Record<string, unknown> => {
+      const readyCount = room.readySessionIds?.length ?? 0
+      const watchCommand = getWatchCommand(room.id, tokenValue)
+      const watchCommandWindows = getWindowsWatchCommand(room.id, tokenValue)
+      const message = `You are ready (${readyCount}/${room.maxPlayers}). Waiting for the opponent to call start-game; the game starts only when both players are ready. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when it starts.`
+      return {
+        message,
+        ...present(room),
+        youReady: true,
+        readyCount,
+        maxPlayers: room.maxPlayers,
+        watchCommand,
+        watchCommandWindows,
+      }
+    }
     const presentNotFull = (room: Room): Record<string, unknown> => {
       const watchCommand = getWatchCommand(room.id, tokenValue)
       const watchCommandWindows = getWindowsWatchCommand(room.id, tokenValue)
       return {
-        message: `Room ${room.id} (${getGameName(room.gameId)}) is not full yet (${room.players.length}/${room.maxPlayers}). You MUST run the returned watchCommand (Windows: watchCommandWindows) to monitor the room status until it is full; do not call start-game before watchCommand reports the room is full.`,
+        message: `Room ${room.id} (${getGameName(room.gameId)}) is not full yet (${room.players.length}/${room.maxPlayers}). You are NOT marked ready until the room is full — call start-game again once everyone has joined so race clocks start fairly. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when the room is full.`,
         ...present(room),
+        readyCount: room.readySessionIds?.length ?? 0,
+        maxPlayers: room.maxPlayers,
         watchCommand,
         watchCommandWindows,
       }
@@ -140,9 +157,8 @@ export default defineMcpTool({
       return echo(presentStarted(room, message))
     }
 
-    if (room.players.length < room.maxPlayers) {
+    if (room.players.length < room.maxPlayers)
       return echo(presentNotFull(room))
-    }
 
     let started: Room
     try {
@@ -162,10 +178,15 @@ export default defineMcpTool({
       const latest = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)
       if (latest.status === 'playing')
         return echo(presentStarted(latest, runningMessage(latest, userId)))
-      if (latest.status === 'waiting')
-        return echo(presentNotFull(latest))
+      if (latest.status === 'waiting') {
+        return latest.players.length < latest.maxPlayers
+          ? echo(presentNotFull(latest))
+          : echo(presentReady(latest))
+      }
       return echo(presentStarted(latest, `${describeRoomOutcome(latest, userId)}; no start needed.`))
     }
+    if (started.status === 'waiting')
+      return echo(presentReady(started))
     return echo(presentStarted(started, startedMessage(started, userId)))
   },
 })

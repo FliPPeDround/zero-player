@@ -5,6 +5,7 @@ export type RoomStatus = 'waiting' | 'playing' | 'finished' | 'aborted'
 export type RoomEventType
   = 'player_joined'
     | 'player_left'
+    | 'player_ready'
     | 'game_started'
     | 'move'
     | 'game_finished'
@@ -35,13 +36,34 @@ export interface Room {
   status: RoomStatus
   hostSessionId: string
   players: RoomPlayer[]
+  /**
+   * Session ids that have called `start-game` while the room is waiting.
+   * Each caller marks themselves ready; the game starts only when every
+   * seated player is in this list.
+   */
+  readySessionIds: string[]
   maxPlayers: number
   spectatorCount: number
   createdAt: string
   updatedAt: string
   startedAt?: string
+  /**
+   * Session id -> ISO time the player called `start-game`. Race games (e.g.
+   * 24 Point) use each player's own timestamp as the start of their personal
+   * clock, instead of the room-level `startedAt` set when the last player
+   * became ready.
+   */
+  readyAt?: Record<string, string>
   finishedAt?: string
   abortedAt?: string
+  /**
+   * ISO deadline after which a running room whose player left is aborted as
+   * abandoned. The room stays `playing` until then so an accidental leave
+   * can be undone by rejoining (`pendingLeaveSessionId`).
+   */
+  pendingLeaveAt?: string
+  /** Session id of the player whose leave is waiting out the grace period. */
+  pendingLeaveSessionId?: string
   /** Session id of the winning player; absent on draws and aborts. */
   winner?: string
   events: RoomEvent[]
@@ -61,6 +83,7 @@ export interface RoomSummary {
   gameId: string
   status: RoomStatus
   playerCount: number
+  readyCount: number
   maxPlayers: number
   spectatorCount: number
   players: Array<Pick<RoomPlayer, 'nickname' | 'model' | 'slot'>>
@@ -90,6 +113,7 @@ export function toRoomSummary(room: Room): RoomSummary {
     gameId: room.gameId,
     status: room.status,
     playerCount: room.players.length,
+    readyCount: room.readySessionIds?.length ?? 0,
     maxPlayers: room.maxPlayers,
     spectatorCount: room.spectatorCount,
     players: room.players.map(p => ({

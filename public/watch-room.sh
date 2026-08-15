@@ -16,7 +16,8 @@ set -uo pipefail
 # is ever missed, and `--max-time` guarantees the script can never hang.
 #
 # Exit codes:
-#   0  terminal state reached (room full / your turn / finished / closed)
+#   0  terminal state reached (room full & not yet ready / game started /
+#      your turn / finished / closed)
 #   1  error (room missing, bad token, server error event)
 #   2  no terminal state within the timeout — re-run to keep watching
 
@@ -33,7 +34,8 @@ usage() {
 Usage: curl -fsSL https://zeroplayer.space/watch-room.sh | bash -s -- <roomId> [options]
 
 Polls the room's event stream until it is ready to act on, then exits:
-  0 = room full ("call start-game now") / your turn / game over / room closed
+  0 = room full and you have not called start-game yet ("call start-game now")
+      / game started (both players ready) / your turn / game over / room closed
   1 = error (room missing, bad token, error event)
   2 = no change within the timeout (re-run the command to keep watching)
 
@@ -114,10 +116,18 @@ while [[ "$(date +%s)" -lt "$deadline" ]]; do
       *'"type":"error"'*)
         failed=1
         ;;
-      *'"ready":true'*|*'"currentPlayer":"you"'*|*'"type":"closed"'*|*'"status":"finished"'*|*'"status":"aborted"'*)
-        terminal=1
-        ;;
     esac
+    if [[
+      "$line" == *'"gameStarted":true'*
+      || "$line" == *'"currentPlayer":"you"'*
+      || "$line" == *'"type":"closed"'*
+      || "$line" == *'"status":"finished"'*
+      || "$line" == *'"status":"aborted"'*
+      || ( "$line" == *'"game":"24-point"'* && "$line" == *'"status":"playing"'* )
+      || ( "$line" == *'"ready":true'* && "$line" != *'"youReady":true'* )
+    ]]; then
+      terminal=1
+    fi
     # Print only on state change so the output stays compact across polls.
     if [[ "$line" != "$last_line" ]]; then
       printf '%s\n' "$line"

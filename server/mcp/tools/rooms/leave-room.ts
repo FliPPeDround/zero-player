@@ -7,7 +7,7 @@ import { toMcpRoomSummary } from '../../utils/room-view'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Leave the room you are currently in: gives up your seat in a waiting room, or abandons a running match (aborted, no winner) so you are free to create or join another room. This asks the user to confirm before leaving; on clients without inline confirmation, pass confirmed: true only after the user has explicitly agreed.',
+  description: 'Leave the room you are currently in: gives up your seat in a waiting room, or leaves a running match — the room is NOT aborted immediately; it stays playing for a short grace period and is only aborted (no winner) afterwards, so an accidental leave can be undone by rejoining the same room with join-room within that window. This asks the user to confirm before leaving; on clients without inline confirmation, pass confirmed: true only after the user has explicitly agreed.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
@@ -69,12 +69,15 @@ export default defineMcpTool({
       method: 'POST',
       headers,
     })
+    const resumed = updated.pendingLeaveAt && updated.status === 'playing'
+    const message = resumed
+      ? `Left room ${updated.id}; the match is NOT over yet. It will be aborted with no winner unless you rejoin room ${updated.id} with join-room before the grace period ends.`
+      : `Left room ${updated.id}.`
     return echo({
-      message: updated.status === 'aborted'
-        ? `Left room ${updated.id}; the running match was aborted (no winner).`
-        : `Left room ${updated.id}.`,
+      message,
       roomId: updated.id,
       room: toMcpRoomSummary(updated),
+      ...(resumed ? { rejoin: `Call join-room with roomId "${updated.id}" to cancel the abandonment and resume the match.` } : {}),
     })
   },
 })

@@ -25,10 +25,12 @@ function isTerminal(room: Room): boolean {
  * with short-lived connections and read the initial snapshot of each poll.
  *
  * While the room is waiting this stream stays compact: an initial snapshot
- * with only the player count / `ready` flag, then `joined` / `left` events
- * for each player change. When the room is full it sends `ready: true` with
- * an explicit "call start-game" hint and closes, so the model can start the
- * game without wading through a full room payload.
+ * with the player count, `ready` (room full) and `youReady` (the watching
+ * player already called `start-game`) flags, then `joined` / `left` / `ready`
+ * events for each player change. `start-game` only marks the caller ready, so
+ * the stream keeps polling until the game actually starts (both players
+ * ready), at which point it emits a `gameStarted` payload with the compact
+ * game state and closes.
  *
  * Once a game is running, token-authenticated watchers get the same compact
  * payload as the `make-<game>-move` tools (yourSide, currentPlayer,
@@ -77,28 +79,40 @@ export default defineEventHandler(async (event) => {
   }
 
   const presentWaiting = (room: Room): Record<string, unknown> => {
-    const ready = room.players.length >= room.maxPlayers
+    const full = room.players.length >= room.maxPlayers
+    const readyCount = room.readySessionIds?.length ?? 0
+    const youReady = !!userId && readySessionIds(room).includes(userId)
     return {
       type: 'snapshot',
       roomId: room.id,
       status: room.status,
       players: room.players.length,
       maxPlayers: room.maxPlayers,
-      ready,
-      ...(ready
-        ? { message: `Room is full (${room.players.length}/${room.maxPlayers}). Call start-game now.` }
-        : {}),
+      ready: full,
+      readyCount,
+      youReady,
+      ...(full && !youReady
+        ? { message: `Room is full (${room.players.length}/${room.maxPlayers}). Call start-game now to mark yourself ready.` }
+        : full
+          ? { message: `You are ready (${readyCount}/${room.maxPlayers}). Waiting for the opponent to call start-game.` }
+          : { message: `Waiting for players (${room.players.length}/${room.maxPlayers}); call start-game once the room is full.` }),
     }
   }
 
   const waitingEvent = (room: Room, event: RoomEvent, type: 'joined' | 'left'): Record<string, unknown> => {
-    const ready = room.players.length >= room.maxPlayers
+    const full = room.players.length >= room.maxPlayers
+    const readyCount = room.readySessionIds?.length ?? 0
+    const youReady = !!userId && readySessionIds(room).includes(userId)
     return {
       type,
       username: event.actor ?? 'unknown',
-      ready,
-      ...(type === 'joined' && ready
-        ? { message: `Room is full (${room.players.length}/${room.maxPlayers}). Call start-game now.` }
+      players: room.players.length,
+      maxPlayers: room.maxPlayers,
+      ready: full,
+      readyCount,
+      youReady,
+      ...(type === 'joined' && full && !youReady
+        ? { message: `Room is full (${room.players.length}/${room.maxPlayers}). Call start-game now to mark yourself ready.` }
         : {}),
     }
   }
@@ -131,6 +145,10 @@ export default defineEventHandler(async (event) => {
     return 'Game is running.'
   }
 
+  function readySessionIds(room: Room): string[] {
+    return room.readySessionIds ?? []
+  }
+
   let stopped = false
   let pollTimer: ReturnType<typeof setTimeout> | undefined
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined
@@ -138,6 +156,7 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   let lastKey = `${initial.updatedAt}|${initial.events.length}`
   let lastEventCount = initial.events.length
+  let lastStatus = initial.status
 
   const stop = (): void => {
     if (stopped)
@@ -154,22 +173,42 @@ export default defineEventHandler(async (event) => {
   const sendJson = (data: unknown): Promise<void> =>
     stream.push(JSON.stringify(data)).catch(() => {})
 
-  /** Emits compact player events while waiting; returns `true` once the room is full and the stream should close. */
-  const emitWaitingEvents = (room: Room, events: RoomEvent[]): boolean => {
+  /** Emits compact player/readiness events while waiting. Never closes the stream. */
+  const emitWaitingEvents = (room: Room, events: RoomEvent[]): void => {
     for (const event of events) {
       if (event.type === 'player_joined') {
         const payload = waitingEvent(room, event, 'joined')
-        if (payload.ready) {
-          void sendJson(payload).then(stop)
-          return true
-        }
         void sendJson(payload)
       }
       else if (event.type === 'player_left') {
         void sendJson(waitingEvent(room, event, 'left'))
       }
+      else if (event.type === 'player_ready') {
+        const readyCount = room.readySessionIds?.length ?? 0
+        void sendJson({
+          type: 'ready',
+          username: event.actor ?? 'unknown',
+          players: room.players.length,
+          maxPlayers: room.maxPlayers,
+          ready: room.players.length >= room.maxPlayers,
+          readyCount,
+          youReady: !!userId && readySessionIds(room).includes(userId),
+          message: `${readyCount}/${room.maxPlayers} ready — the game starts when both players have called start-game.`,
+        })
+      }
     }
-    return false
+  }
+
+  /** The waiting watcher's terminal payload: the game just started. */
+  const presentGameStarted = (room: Room, type: 'snapshot' | 'update'): void => {
+    if (userId && tokenValue) {
+      void sendJson({
+        ...presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)),
+        gameStarted: true,
+      }).then(stop)
+      return
+    }
+    void sendJson({ ...presentFull(type, room), gameStarted: true }).then(stop)
   }
 
   unsubscribe = onRoomDetail(id, (message) => {
@@ -189,12 +228,19 @@ export default defineEventHandler(async (event) => {
     }
 
     const room = message.room
+    const prevStatus = lastStatus
+    lastStatus = room.status
     lastKey = `${room.updatedAt}|${room.events.length}`
     const newEvents = room.events.slice(lastEventCount)
     lastEventCount = room.events.length
 
     if (room.status === 'waiting') {
       emitWaitingEvents(room, newEvents)
+      return
+    }
+
+    if (prevStatus === 'waiting') {
+      presentGameStarted(room, message.type === 'snapshot' ? 'snapshot' : 'update')
       return
     }
 
@@ -234,15 +280,20 @@ export default defineEventHandler(async (event) => {
           stop()
           return
         }
+        const prevStatus = lastStatus
+        lastStatus = room.status
         const key = `${room.updatedAt}|${room.events.length}`
         if (key !== lastKey) {
           lastKey = key
           const newEvents = room.events.slice(lastEventCount)
           lastEventCount = room.events.length
           if (room.status === 'waiting') {
-            if (emitWaitingEvents(room, newEvents))
-              return
+            emitWaitingEvents(room, newEvents)
             schedulePoll(Date.now() - startedAt)
+            return
+          }
+          if (prevStatus === 'waiting') {
+            presentGameStarted(room, 'update')
             return
           }
           if (userId && tokenValue) {
@@ -292,10 +343,7 @@ export default defineEventHandler(async (event) => {
   if (initial.status === 'waiting') {
     const snapshot = presentWaiting(initial)
     void sendJson(snapshot)
-    if (snapshot.ready)
-      stop()
-    else
-      schedulePoll(0)
+    schedulePoll(0)
   }
   else {
     if (userId && tokenValue) {

@@ -181,6 +181,10 @@ const closesInLabel = computed(() => {
     <div class="flex gap-2 items-center justify-between">
       <span class="text-mini color-muted font-mono shrink-0 tabular-nums">
         <DisplayNumber :value="room.playerCount" />/{{ room.maxPlayers }}
+        <template v-if="room.status === 'waiting'">
+          <span class="mx-1 op-fade" aria-hidden="true">·</span>
+          ready {{ room.readyCount ?? 0 }}
+        </template>
       </span>
       <DisplayProgressBar
         :value="fillRatio"

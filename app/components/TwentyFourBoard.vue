@@ -24,7 +24,9 @@ interface TwentyFourPanel {
   player: RoomPlayer | null
   solved: number
   attempts: number
-  currentNumbers: number[]
+  /** Personal race clock: elapsed since this player called `start-game`. */
+  timeMs: number | null
+  puzzles: number[][]
   currentQuestion: number
   viewedQuestion: number
   isCurrent: boolean
@@ -51,9 +53,9 @@ const panels = computed<TwentyFourPanel[]>(() => (
     const solved = player ? (state.value?.progress[player.sessionId] ?? 0) : 0
     const attempts = player ? (state.value?.attempts[player.sessionId] ?? 0) : 0
     const puzzleCount = state.value?.puzzles.length ?? TWENTY_FOUR_QUESTIONS
+    const timeMs = playerTimeMs(player?.sessionId ?? null)
     const currentQuestion = Math.min(solved + 1, puzzleCount)
     const viewedQuestion = selectedQuestion.value[side.key] ?? currentQuestion
-    const viewedIndex = Math.min(viewedQuestion - 1, puzzleCount - 1)
     const events = player
       ? (props.room?.events ?? []).filter(event => (
           event.type === 'move'
@@ -66,7 +68,8 @@ const panels = computed<TwentyFourPanel[]>(() => (
       player,
       solved,
       attempts,
-      currentNumbers: state.value?.puzzles[viewedIndex] ?? [],
+      timeMs,
+      puzzles: state.value?.puzzles ?? [],
       currentQuestion,
       viewedQuestion,
       isCurrent: viewedQuestion === currentQuestion,
@@ -81,15 +84,29 @@ function viewQuestion(sideKey: string, question: number): void {
   selectedQuestion.value[sideKey] = question
 }
 
-const elapsedMs = computed(() => {
-  const startedAt = props.room?.startedAt ? new Date(props.room.startedAt).getTime() : 0
-  if (!startedAt)
-    return 0
-  const endedAt = props.room?.finishedAt
-    ? new Date(props.room.finishedAt).getTime()
-    : now.value.getTime()
-  return Math.max(0, endedAt - startedAt)
-})
+/**
+ * Each player's clock starts when THEY called `start-game` (`room.readyAt`),
+ * not when the room as a whole started. It runs until they solve the last
+ * question (`state.finishedAt`); the race keeps going until both players have
+ * finished, and a player who never finished shows no time.
+ */
+function playerTimeMs(sessionId: string | null): number | null {
+  if (!sessionId)
+    return null
+  const readyAt = props.room?.readyAt?.[sessionId]
+  if (!readyAt)
+    return null
+  const start = new Date(readyAt).getTime()
+  const personalEnd = state.value?.finishedAt?.[sessionId]
+  const endedAt = personalEnd
+    ? new Date(personalEnd).getTime()
+    : props.room?.status === 'finished'
+      ? null
+      : now.value.getTime()
+  if (endedAt === null || !Number.isFinite(endedAt))
+    return null
+  return Math.max(0, endedAt - start)
+}
 
 function questionDotClass(panel: TwentyFourPanel, question: number): string {
   if (question === panel.viewedQuestion)
@@ -114,13 +131,9 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
           class="shrink-0"
         />
         <span class="text-mini color-muted truncate">
-          First to solve all three questions wins
+          Your clock starts when you call start-game; shortest time to solve all six questions wins
         </span>
       </div>
-      <span class="text-mini color-muted flex shrink-0 gap-1.5 items-center">
-        <span class="i-carbon-time" aria-hidden="true" />
-        <DisplayDuration :ms="elapsedMs" :colorize="true" />
-      </span>
     </div>
 
     <div class="gap-4 grid items-stretch lg:grid-cols-2">
@@ -176,6 +189,14 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
             />
             <span class="text-mini color-faint font-mono">
               <DisplayNumber :value="panel.attempts" suffix=" attempts" />
+              <span class="mx-1.5 op-fade" aria-hidden="true">·</span>
+              <template v-if="panel.timeMs !== null">
+                <span class="i-carbon-time" aria-hidden="true" />
+                <DisplayDuration :ms="panel.timeMs" :colorize="true" />
+              </template>
+              <template v-else>
+                Did not finish
+              </template>
             </span>
           </div>
         </div>
@@ -227,24 +248,39 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
               />
             </div>
 
-            <div class="bg-dots-20 p-4 border border-base rounded-2xl bg-secondary">
-              <div class="gap-3 grid grid-cols-2">
+            <div class="bg-dots-20 p-4 border border-base rounded-2xl bg-secondary relative overflow-hidden">
+              <div
+                class="will-change-transform flex transition-transform duration-300 ease-out"
+                :style="{
+                  width: `${TWENTY_FOUR_QUESTIONS * 100}%`,
+                  transform: `translateX(-${Math.min(panel.viewedQuestion - 1, TWENTY_FOUR_QUESTIONS - 1) * (100 / TWENTY_FOUR_QUESTIONS)}%)`,
+                }"
+              >
                 <div
-                  v-for="(number, index) in panel.currentNumbers"
-                  :key="index"
-                  class="text-5xl font-mono font-semibold py-6 text-center border border-base rounded-xl bg-base tabular-nums"
+                  v-for="question in TWENTY_FOUR_QUESTIONS"
+                  :key="question"
+                  class="shrink-0"
+                  :style="{ width: `${100 / TWENTY_FOUR_QUESTIONS}%` }"
                 >
-                  {{ number }}
+                  <div class="gap-3 grid grid-cols-2">
+                    <div
+                      v-for="(number, index) in panel.puzzles[question - 1] ?? []"
+                      :key="index"
+                      class="text-5xl font-mono font-semibold py-6 text-center border border-base rounded-xl bg-base tabular-nums"
+                    >
+                      {{ number }}
+                    </div>
+                  </div>
+                  <div class="mt-4 flex gap-2 items-center justify-center">
+                    <span
+                      v-for="operator in OPERATORS"
+                      :key="operator"
+                      class="text-lg color-muted font-mono border border-base rounded-lg bg-base grid h-10 w-10 place-items-center"
+                    >
+                      {{ operator }}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div class="mt-4 flex gap-2 items-center justify-center">
-                <span
-                  v-for="operator in OPERATORS"
-                  :key="operator"
-                  class="text-lg color-muted font-mono border border-base rounded-lg bg-base grid h-10 w-10 place-items-center"
-                >
-                  {{ operator }}
-                </span>
               </div>
             </div>
 

@@ -8,7 +8,7 @@ import { TwentyFourGame } from './TwentyFourGame'
 type GameConstructor<
   TAction extends GameActionRecord = GameActionRecord,
   TState = unknown,
-> = (new (roomId: string, players: GamePlayer[]) => BaseGame<TAction, TState>) & {
+> = (new (roomId: string, players: GamePlayer[], playerStarts?: Record<string, string>) => BaseGame<TAction, TState>) & {
   /**
    * MCP is the primary way agents play, so every registered game must expose
    * its move tool contract; the one-line file under `server/mcp/tools/games/`
@@ -49,7 +49,7 @@ export function createGameInstance(room: Room): BaseGame {
     nickname,
     slot,
   }))
-  const game = new GameClass(room.id, players)
+  const game = new GameClass(room.id, players, room.readyAt)
 
   if (room.game)
     game.restore(room.game)

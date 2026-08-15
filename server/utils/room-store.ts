@@ -32,6 +32,12 @@ let roomListCache: { rooms: RoomSummary[], builtAt: number } | null = null
 const WAITING_IDLE_MS = envMs('ROOMS_WAITING_IDLE_MS', 60 * 60 * 1000)
 const STALL_TIMEOUT_MS = envMs('ROOMS_STALL_TIMEOUT_MS', 60 * 60 * 1000)
 const TERMINAL_RETENTION_MS = envMs('ROOMS_TERMINAL_RETENTION_MS', 10 * 60 * 1000)
+/**
+ * How long a running room stays `playing` after a player leaves before it is
+ * aborted as abandoned. The leaver can rejoin during this window to cancel
+ * the pending abandonment (an accidental AI leave is not instantly terminal).
+ */
+const LEAVE_GRACE_MS = envMs('ROOMS_LEAVE_GRACE_MS', 5 * 60 * 1000)
 const KV_TTL_MAX_SECONDS = 60 * 60 * 24 * 7
 
 let eventCounter = 0
@@ -124,6 +130,8 @@ function emitDetail(roomId: string, message: RoomDetailSocketMessage): RoomDetai
  * order whenever the stored slots no longer match the game definition.
  */
 function normalizeRoomSides(room: Room): void {
+  if (!Array.isArray(room.readySessionIds))
+    room.readySessionIds = []
   const sides = getGame(room.gameId)?.sides ?? []
   if (!sides.length)
     return
@@ -296,6 +304,7 @@ export async function createRoom(
     status: 'waiting',
     hostSessionId: agent.sessionId,
     players: [],
+    readySessionIds: [],
     maxPlayers: game.maxPlayers,
     spectatorCount: 0,
     createdAt: new Date().toISOString(),
@@ -411,12 +420,29 @@ export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Ro
   if (activeRoom && activeRoom.id !== roomId)
     throw createError({ statusCode: 409, statusMessage: `You are already in room ${activeRoom.id}; leave it first` })
 
-  if (room.status !== 'waiting')
+  const isAlreadyPlayer = room.players.some(player => player.sessionId === agent.sessionId)
+  const mayResume = room.status === 'playing'
+    && isAlreadyPlayer
+    && room.pendingLeaveSessionId === agent.sessionId
+    && typeof room.pendingLeaveAt === 'string'
+    && new Date(room.pendingLeaveAt).getTime() > Date.now()
+
+  if (room.status !== 'waiting' && !mayResume)
     throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}; it is no longer accepting players` })
-  if (room.players.some(player => player.sessionId === agent.sessionId)) {
+
+  if (isAlreadyPlayer) {
     await setSessionRoom(agent.sessionId, room.id)
+    if (mayResume) {
+      // The leaver is back inside the grace window: cancel the pending
+      // abandonment and resume the match where it left off.
+      room.pendingLeaveAt = undefined
+      room.pendingLeaveSessionId = undefined
+      appendEvent(room, 'player_joined', agent.nickname, { resumed: true })
+      await persistRoom(room, 'updated')
+    }
     return room
   }
+
   if (room.players.length >= room.maxPlayers)
     throw createError({ statusCode: 409, statusMessage: 'Room is full' })
 
@@ -431,21 +457,46 @@ export async function joinRoom(roomId: string, agent: AgentIdentity): Promise<Ro
 }
 
 /**
- * Explicit game start. Any player in the room may start once it is full; the
- * REST/MCP layer stays game-agnostic and only asks the engine to initialize
- * its snapshot (empty Gomoku board, generated 24 Point puzzles, ...).
+ * Explicit player-ready signal. Calling this marks the caller as ready, and
+ * the game starts only once every seated player has called it. A player may
+ * only become ready when the room is full — otherwise a race game such as
+ * 24 Point would let the early caller's personal clock run while the other
+ * player has not even joined, which defeats the fairness `start-game`
+ * exists to provide. The timestamp of each player's call is recorded in
+ * `room.readyAt` so race games can clock each player from their own start.
  */
 export async function startRoom(roomId: string, agent: AgentIdentity): Promise<Room> {
   const room = await requireRoom(roomId)
 
   if (!room.players.some(player => player.sessionId === agent.sessionId))
     throw createError({ statusCode: 403, statusMessage: 'You are not a player in this room' })
+
+  if (room.status === 'playing')
+    return room
+
   if (room.status !== 'waiting')
     throw createError({ statusCode: 409, statusMessage: `Room is ${room.status}; it cannot be started` })
   if (room.players.length < room.maxPlayers)
-    throw createError({ statusCode: 409, statusMessage: `Room is not full yet (${room.players.length}/${room.maxPlayers})` })
+    throw createError({ statusCode: 409, statusMessage: `Room is not full yet (${room.players.length}/${room.maxPlayers}); call start-game after everyone has joined` })
 
-  await startGame(room)
+  if (!room.readySessionIds.includes(agent.sessionId)) {
+    room.readySessionIds.push(agent.sessionId)
+    room.readyAt = {
+      ...(room.readyAt ?? {}),
+      [agent.sessionId]: new Date().toISOString(),
+    }
+    const player = room.players.find(candidate => candidate.sessionId === agent.sessionId)
+    appendEvent(room, 'player_ready', player?.nickname)
+  }
+
+  const allReady = room.players.length >= room.maxPlayers
+    && room.players.every(player => room.readySessionIds.includes(player.sessionId))
+
+  if (allReady)
+    await startGame(room)
+  else
+    await persistRoom(room, 'updated')
+
   return room
 }
 
@@ -456,16 +507,37 @@ export async function leaveRoom(roomId: string, agent: AgentIdentity): Promise<R
   if (index === -1)
     throw createError({ statusCode: 409, statusMessage: 'You are not in this room' })
 
-  if (room.status === 'playing')
-    return await abortRoom(room, agent.nickname, 'abandoned')
+  if (room.status === 'playing') {
+    // Do not make an accidental leave terminal: keep the match `playing` for a
+    // grace period. If the leaver rejoins in time the pending abandonment is
+    // cancelled; otherwise the sweep aborts the room as abandoned.
+    room.pendingLeaveSessionId = agent.sessionId
+    room.pendingLeaveAt = new Date(Date.now() + LEAVE_GRACE_MS).toISOString()
+    const leaver = room.players[index]
+    appendEvent(room, 'player_left', leaver?.nickname, { pendingAbandon: true, graceMs: LEAVE_GRACE_MS })
+    await clearSessionRoom(agent.sessionId)
+    await persistRoom(room, 'updated')
+    return room
+  }
 
   const [leaver] = room.players.splice(index, 1)
+  room.readySessionIds = room.readySessionIds.filter(id => id !== agent.sessionId)
+  if (room.readyAt)
+    delete room.readyAt[agent.sessionId]
   appendEvent(room, 'player_left', leaver?.nickname)
   if (leaver)
     await clearSessionRoom(leaver.sessionId)
 
   if (room.hostSessionId === leaver?.sessionId && room.players[0])
     room.hostSessionId = room.players[0].sessionId
+
+  // Readiness only exists while the room is full ("everyone must be present
+  // before anyone can be ready"). Once the room drops below full, every
+  // remaining player has to call start-game again after it refills.
+  if (room.players.length < room.maxPlayers) {
+    room.readySessionIds = []
+    room.readyAt = undefined
+  }
 
   if (room.players.length === 0) {
     return (await deleteRoom(room.id)) ?? room
@@ -509,6 +581,8 @@ export function submitGameMove(
 
     if (!room.players.some(player => player.sessionId === playerId))
       throw createError({ statusCode: 403, statusMessage: 'You are not a player in this room' })
+    if (room.pendingLeaveSessionId === playerId)
+      throw createError({ statusCode: 409, statusMessage: 'You left this room; rejoin it to resume the game' })
 
     const game = createGameInstance(room)
     const outcome = game.play(playerId, action)
@@ -588,6 +662,16 @@ export async function sweepExpiredRooms(): Promise<number> {
   for (const room of storedRooms) {
     if (!room)
       continue
+    // Pending-leave grace window expired: the leaver never came back, so the
+    // running match is abandoned.
+    if (room.status === 'playing' && room.pendingLeaveAt && new Date(room.pendingLeaveAt).getTime() <= Date.now()) {
+      const leaverNickname = room.pendingLeaveSessionId
+        ? room.players.find(player => player.sessionId === room.pendingLeaveSessionId)?.nickname
+        : undefined
+      await abortRoom(room, leaverNickname, 'abandoned')
+      closed += 1
+      continue
+    }
     if (!room.closesAt) {
       room.closesAt = computeClosesAt(room)
       await persistRoom(room, 'updated')

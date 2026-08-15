@@ -22,7 +22,7 @@ function joinedMessage(room: Room, userId: string): string {
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Take a seat in a waiting room found through browse-rooms. Returns immediately with the room id, a compact room summary (id, name, gameId, status, playerCount, maxPlayers) and a watchCommand; the room stays waiting until full and any player then starts it with start-game.',
+  description: 'Take a seat in a waiting room found through browse-rooms (or rejoin a room you left while its running match is still in the leave grace period). Returns immediately with the room id, a compact room summary (id, name, gameId, status, playerCount, maxPlayers) and a watchCommand. Once the room is full, every player must call start-game to mark themselves ready; the game starts only when all players have called it.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -55,10 +55,10 @@ export default defineMcpTool({
     const guidance = terminal
       ? ''
       : room.status === 'waiting' && room.players.length >= room.maxPlayers
-        ? ' Room is full — call start-game now.'
+        ? ' Room is full — call start-game now to mark yourself ready; the game starts only after every player has called it.'
         : room.status === 'playing'
           ? ' Run the returned watchCommand (Windows: watchCommandWindows) to be notified when it is your turn.'
-          : ' You MUST run the returned watchCommand (Windows: watchCommandWindows) to monitor the room status until it is full; do not call start-game before watchCommand reports the room is full.'
+          : ' You MUST run the returned watchCommand (Windows: watchCommandWindows) to monitor the room status until it is full, then call start-game to mark yourself ready (each player must call it; the game starts only after every player has).'
     return echo({
       message: `${joinedMessage(room, userId)}${invitation}${guidance}`,
       roomId: room.id,

@@ -130,6 +130,13 @@ useHead({
         </div>
         <div v-if="room" class="flex shrink-0 flex-col gap-1 items-end">
           <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" />
+          <DisplayBadge
+            v-if="room.status === 'waiting'"
+            :text="`Ready ${room.readySessionIds?.length ?? 0}/${room.players.length}`"
+            :color="false"
+            rounded="full"
+            class="text-mini shrink-0"
+          />
           <span class="text-xs color-muted flex gap-1 items-center">
             <span class="i-carbon-view" aria-hidden="true" />
             <DisplayNumber :value="room.spectatorCount" />

@@ -12,7 +12,7 @@ function createdMessage(room: Room, roomUrl: string): string {
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Create a new room. The calling agent is added as the first player; the room stays waiting until it is full, then any player can start it with start-game. Returns immediately with the room id, a compact room summary (id, name, gameId, status, playerCount, maxPlayers) and a watchCommand that streams live updates.',
+  description: 'Create a new room. The calling agent is added as the first player; the room stays waiting, and once it is full every player must call start-game to mark themselves ready — the game starts only once all players have called it. Returns immediately with the room id, a compact room summary (id, name, gameId, status, playerCount, maxPlayers) and a watchCommand that streams live updates.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,

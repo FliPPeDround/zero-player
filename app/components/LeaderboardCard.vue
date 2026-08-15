@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoomSummary } from '#shared/rooms'
+import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
@@ -9,7 +10,6 @@ import FeedbackLoading from '@antfu/design/components/Feedback/FeedbackLoading.v
 import FormSegmentedControl from '@antfu/design/components/Form/FormSegmentedControl.vue'
 import FormSelect from '@antfu/design/components/Form/FormSelect.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
-import LayoutExpandableList from '@antfu/design/components/Layout/LayoutExpandableList.vue'
 import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
 
 interface LeaderboardEntry {
@@ -69,6 +69,25 @@ const gameOptions = computed(() => [
 const entries = computed(() => {
   return data.value?.[dimension.value] ?? []
 })
+
+const PAGE_SIZE = 5
+const shown = ref(PAGE_SIZE)
+
+watch([dimension, gameFilter], () => {
+  shown.value = PAGE_SIZE
+})
+
+const visibleEntries = computed(() => entries.value.slice(0, shown.value))
+const hiddenCount = computed(() => Math.max(0, entries.value.length - shown.value))
+const expanded = computed(() => shown.value >= entries.value.length)
+
+function showMore(): void {
+  shown.value = Math.min(entries.value.length, shown.value + PAGE_SIZE)
+}
+
+function collapse(): void {
+  shown.value = PAGE_SIZE
+}
 
 const seenFinishedIds = ref(new Set<string>())
 
@@ -149,67 +168,87 @@ watch(() => props.rooms, (rooms) => {
           </template>
         </FeedbackEmptyState>
       </LayoutPanelGrids>
-      <LayoutExpandableList
-        v-else
-        :key="`${dimension}-${gameFilter}`"
-        :items="entries"
-        :max="5"
-        :step="5"
-      >
-        <template #default="{ item, index }">
-          <div
-            class="px-4 py-2.5 border-t border-mute gap-3 grid grid-cols-[28px_minmax(0,1fr)_auto] items-center first:border-t-0"
+      <div v-else class="relative">
+        <div
+          v-for="(item, index) in visibleEntries"
+          :key="item.key"
+          class="px-4 py-2.5 border-t border-mute gap-3 grid grid-cols-[28px_minmax(0,1fr)_auto] items-center first:border-t-0"
+        >
+          <span
+            class="text-sm font-mono tabular-nums"
+            :class="index === 0 ? 'color-active font-semibold' : 'color-faint'"
           >
-            <span
-              class="text-sm font-mono tabular-nums"
-              :class="index === 0 ? 'color-active font-semibold' : 'color-faint'"
-            >
-              #{{ index + 1 }}
-            </span>
-            <div class="min-w-0">
-              <div class="flex flex-wrap gap-1.5 min-w-0 items-center">
-                <DisplayBadge
-                  :text="item.key"
-                  :color="false"
-                  rounded="full"
-                  class="text-mini max-w-full min-w-0 overflow-hidden"
-                >
-                  <span class="truncate">{{ item.key }}</span>
-                </DisplayBadge>
-                <span class="text-mini color-faint font-mono shrink-0">
-                  <DisplayNumber :value="item.played" suffix=" games" />
-                </span>
-              </div>
-              <div class="mt-1.5 max-w-52">
-                <DisplayProgressBar
-                  :value="item.winRate"
-                  :height="3"
-                  :label="`Win rate for ${item.key}`"
-                />
-              </div>
+            #{{ index + 1 }}
+          </span>
+          <div class="min-w-0">
+            <div class="flex flex-wrap gap-1.5 min-w-0 items-center">
+              <DisplayBadge
+                :text="item.key"
+                :color="false"
+                rounded="full"
+                class="text-mini max-w-full min-w-0 overflow-hidden"
+              >
+                <span class="truncate">{{ item.key }}</span>
+              </DisplayBadge>
+              <span class="text-mini color-faint font-mono shrink-0">
+                <DisplayNumber :value="item.played" suffix=" games" />
+              </span>
             </div>
-            <div class="text-right shrink-0">
-              <div class="text-base leading-tight font-mono font-semibold tabular-nums">
-                <DisplayNumber
-                  :value="item.winRate * 100"
-                  :options="{ maximumFractionDigits: 1 }"
-                  suffix="%"
-                />
-              </div>
-              <div class="text-mini color-faint font-mono">
-                <DisplayNumber
-                  :value="item.wins"
-                  :options="{ maximumFractionDigits: 1 }"
-                />W ·
-                <DisplayNumber
-                  :value="item.losses"
-                  :options="{ maximumFractionDigits: 1 }"
-                />L
-              </div>
+            <div class="mt-1.5 max-w-52">
+              <DisplayProgressBar
+                :value="item.winRate"
+                :height="3"
+                :label="`Win rate for ${item.key}`"
+              />
             </div>
           </div>
-        </template>
-      </LayoutExpandableList>
+          <div class="text-right shrink-0">
+            <div class="text-base leading-tight font-mono font-semibold tabular-nums">
+              <DisplayNumber
+                :value="item.winRate * 100"
+                :options="{ maximumFractionDigits: 1 }"
+                suffix="%"
+              />
+            </div>
+            <div class="text-mini color-faint font-mono">
+              <DisplayNumber
+                :value="item.wins"
+                :options="{ maximumFractionDigits: 1 }"
+              />W ·
+              <DisplayNumber
+                :value="item.losses"
+                :options="{ maximumFractionDigits: 1 }"
+              />L
+            </div>
+          </div>
+        </div>
+        <div
+          v-if="hiddenCount > 0"
+          class="h-8 pointer-events-none inset-x-0 bottom-0 absolute bg-gradient-more"
+        />
+      </div>
+
+      <div
+        v-if="hiddenCount > 0 || (expanded && entries.length > PAGE_SIZE)"
+        class="px-4 py-2.5 flex items-center justify-center"
+      >
+        <ActionButton
+          size="sm"
+          variant="action"
+          @click="expanded ? collapse() : showMore()"
+        >
+          <span>{{ expanded ? 'Show less' : 'Show more' }}</span>
+          <DisplayNumberBadge
+            v-if="hiddenCount > 0"
+            :value="hiddenCount"
+            class="text-mini"
+          />
+          <span
+            :class="expanded ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'"
+            aria-hidden="true"
+          />
+        </ActionButton>
+      </div>
     </div>
     <div class="px-4 py-2 border-t border-base">
       <span class="text-mini color-faint flex gap-1.5 items-center">

@@ -480,8 +480,14 @@ function dieTitle(nickname: string, index: number): string {
               </div>
             </div>
 
-            <div v-if="round.actions.length" class="px-4 pb-4 flex flex-col gap-3 -mt-2">
-              <h3 class="text-mini color-muted tracking-wide font-medium uppercase">
+            <div
+              v-if="round.actions.length || (round.isCurrent && turnPlayer && room?.status === 'playing')"
+              class="px-4 pb-4 flex flex-col gap-3 -mt-2"
+            >
+              <h3
+                v-if="round.actions.length"
+                class="text-mini color-muted tracking-wide font-medium uppercase"
+              >
                 Actions
               </h3>
               <div
