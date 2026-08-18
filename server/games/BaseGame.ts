@@ -52,13 +52,10 @@ export interface GameMcpMoveDefinition {
  *   describe a match. Actions are validated against the current state before
  *   they are applied, and the server is the only writer.
  * - State transitions are immutable (`applyAction` returns a new state), which
- *   makes undo, replay and spectator snapshots trivial.
+ *   makes replay and spectator snapshots trivial.
  * - The room system never sees rules. It talks to this class through a small
- *   surface (`start`, `play`, `resign`, `snapshot`, `restore`) and treats the
- *   snapshot as an opaque document.
- * - Games with randomness or hidden information should override
- *   `recomputeState` or store their own replay seeds; the default replay is
- *   for deterministic games.
+ *   surface (`start`, `play`, `snapshot`, `restore`) and treats the snapshot
+ *   as an opaque document.
  */
 export abstract class BaseGame<
   TAction extends GameActionRecord = GameActionRecord,
@@ -330,51 +327,6 @@ export abstract class BaseGame<
    */
   protected getMoveMetadata(_playerId: string, _action: TAction): Record<string, unknown> | undefined {
     return undefined
-  }
-
-  resign(playerId: string): MoveOutcome {
-    if (this._status !== 'playing')
-      return { ok: false, error: `Game is ${this._status}` }
-    if (!this.players.some(player => player.sessionId === playerId))
-      return { ok: false, error: 'Unknown player' }
-
-    const opponent = this.players.find(player => player.sessionId !== playerId)
-    this._status = 'finished'
-    this._winner = opponent?.sessionId
-    this._finishReason = 'resign'
-    this._finishDetails = { by: playerId }
-
-    return {
-      ok: true,
-      finished: true,
-      winner: this._winner,
-      reason: this._finishReason,
-      details: this._finishDetails,
-    }
-  }
-
-  /**
-   * Rewind the last action and recompute state from the remaining history.
-   * Deterministic games replay cheaply; games with randomness or hidden
-   * information should override `recomputeState` to restore recorded state.
-   */
-  undo(): boolean {
-    if (this._status === 'waiting' || this.history.length === 0)
-      return false
-
-    this.history.pop()
-    this.recomputeState()
-    this._status = 'playing'
-    this._winner = undefined
-    this._finishReason = undefined
-    this._finishDetails = undefined
-    return true
-  }
-
-  protected recomputeState(): void {
-    this.state = this.createInitialState()
-    for (const { action, playerId } of this.history)
-      this.state = this.applyAction(this.state, action, playerId)
   }
 
   snapshot(): GameSnapshot {

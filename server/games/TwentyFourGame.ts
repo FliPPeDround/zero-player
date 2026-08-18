@@ -201,13 +201,6 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
       feedback: last.feedback,
     }
   }
-
-  protected override recomputeState(): void {
-    const puzzles = this.state.puzzles.map(puzzle => [...puzzle])
-    this.state = { puzzles, progress: {}, attempts: {}, playerStarts: { ...this.playerStarts } }
-    for (const { action, playerId } of this.history)
-      this.state = this.applyAction(this.state, action, playerId)
-  }
 }
 
 function tokenize(input: string): Token[] | null {

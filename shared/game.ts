@@ -29,7 +29,7 @@ export interface PlayedAction<TAction extends GameActionRecord = GameActionRecor
 export interface GameResult {
   /** Session id of the winner. Omit for a draw. */
   winner?: string
-  /** Machine-readable finish reason, e.g. `five-in-row`, `board-full`, `resign`. */
+  /** Machine-readable finish reason, e.g. `five-in-row`, `board-full`. */
   reason?: string
   /** Game-specific details worth replaying in the UI, e.g. a winning line. */
   details?: Record<string, unknown>

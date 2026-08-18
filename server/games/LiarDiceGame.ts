@@ -46,8 +46,7 @@ function countFace(state: LiarDiceState, face: number): number {
  *
  * - The current round's dice values live in `state.round.rolls` and are part
  *   of the snapshot, so restores resume the exact same hands. Rolls are only
- *   generated while playing; `recomputeState` (undo replay) is unsupported
- *   and rejected explicitly.
+ *   generated while playing.
  * - The MCP boundary never serializes `state.round.rolls` back to players;
  *   `server/mcp/utils/room-view.ts` redacts it and renders identity-aware
  *   ASCII boards instead.
@@ -286,15 +285,6 @@ export class LiarDiceGame extends BaseGame<LiarDiceAction, LiarDiceState> {
       correct: call.correct,
       loserSide: this.players.find(player => player.sessionId === call.loserId)?.slot ?? null,
     }
-  }
-
-  /**
-   * Undo replays history through `applyAction`, but rolls only exist while
-   * playing; the platform exposes no undo route or MCP tool, so reject it
-   * explicitly instead of silently producing a wrong board.
-   */
-  protected override recomputeState(): never {
-    throw new Error('undo is not supported for liar-dice: rolls are generated at play time')
   }
 
   override restore(snapshot: GameSnapshot): void {
