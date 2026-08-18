@@ -30,14 +30,16 @@ interface LeaderboardResponse {
 
 type Dimension = 'model' | 'harness' | 'combo'
 
+const { t } = useAppI18n()
+
 const dimension = ref<Dimension>('model')
 const gameFilter = ref('all')
 
-const dimensionOptions = [
-  { value: 'model', label: 'Model' },
-  { value: 'harness', label: 'Harness' },
-  { value: 'combo', label: 'Model + Harness' },
-]
+const dimensionOptions = computed(() => [
+  { value: 'model', label: t('leaderboard.dimension.model') },
+  { value: 'harness', label: t('leaderboard.dimension.harness') },
+  { value: 'combo', label: t('leaderboard.dimension.combo') },
+])
 
 const { data, pending, error } = await useFetch<LeaderboardResponse>(
   '/api/leaderboard',
@@ -55,7 +57,7 @@ const { data, pending, error } = await useFetch<LeaderboardResponse>(
 const showGameFilter = computed(() => (data.value?.games.length ?? 0) > 1)
 
 const gameOptions = computed(() => [
-  { value: 'all', label: 'All games' },
+  { value: 'all', label: t('leaderboard.allGames') },
   ...(data.value?.games ?? []).map(game => ({ value: game.id, label: game.name })),
 ])
 
@@ -75,32 +77,32 @@ const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
       <div class="flex flex-wrap gap-2 items-center justify-between">
         <h2 class="text-sm font-medium flex gap-1.5 items-center">
           <span class="i-carbon-trophy text-base color-active" aria-hidden="true" />
-          Leaderboard
+          {{ t('leaderboard.title') }}
         </h2>
         <DisplayNumberBadge
           v-if="data"
           :value="data.totals.finished"
-          suffix=" games"
+          :suffix="t('leaderboard.games', { count: data.totals.finished })"
         />
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
         <div class="flex flex-wrap gap-2 items-center">
-          <span class="text-micro color-faint tracking-wide uppercase">Rank by</span>
+          <span class="text-micro color-faint tracking-wide uppercase">{{ t('leaderboard.rankBy') }}</span>
           <FormSegmentedControl v-model="dimension" :options="dimensionOptions" />
         </div>
         <div v-if="showGameFilter" class="flex flex-wrap gap-2 items-center">
-          <span class="text-micro color-faint tracking-wide uppercase">Game</span>
+          <span class="text-micro color-faint tracking-wide uppercase">{{ t('leaderboard.game') }}</span>
           <ActionToggleGroup v-model="gameFilter" :options="gameOptions" />
         </div>
       </div>
     </div>
 
     <div>
-      <FeedbackLoading v-if="pending && !data" panel text="Loading rankings" />
+      <FeedbackLoading v-if="pending && !data" panel :text="t('leaderboard.loading')" />
       <LayoutPanelGrids v-else-if="error" variant="dots" :size="18">
         <FeedbackEmptyState
           icon="i-carbon-warning"
-          title="Rankings unavailable"
+          :title="t('leaderboard.unavailable')"
         >
           <template #hint>
             {{ error }}
@@ -114,20 +116,20 @@ const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
       >
         <FeedbackEmptyState
           icon="i-carbon-trophy"
-          title="No rankings yet"
+          :title="t('leaderboard.noRankings')"
         >
           <template #hint>
-            Finished matches will appear here once agents complete games.
+            {{ t('leaderboard.noRankingsHint') }}
           </template>
         </FeedbackEmptyState>
       </LayoutPanelGrids>
       <LayoutPanelGrids v-else-if="entries.length === 0" variant="dots" :size="18">
         <FeedbackEmptyState
           icon="i-carbon-filter"
-          title="No entries match"
+          :title="t('leaderboard.noEntries')"
         >
           <template #hint>
-            No finished matches for this game yet.
+            {{ t('leaderboard.noEntriesHint') }}
           </template>
         </FeedbackEmptyState>
       </LayoutPanelGrids>
@@ -154,14 +156,17 @@ const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
                 <span class="truncate">{{ item.key }}</span>
               </DisplayBadge>
               <span class="text-mini color-faint font-mono shrink-0">
-                <DisplayNumber :value="item.played" suffix=" games" />
+                <DisplayNumber
+                  :value="item.played"
+                  :suffix="t('leaderboard.games', { count: item.played })"
+                />
               </span>
             </div>
             <div class="mt-1.5 max-w-52">
               <DisplayProgressBar
                 :value="item.winRate"
                 :height="3"
-                :label="`Win rate for ${item.key}`"
+                :label="t('leaderboard.winRateLabel', { key: item.key })"
               />
             </div>
           </div>
@@ -177,11 +182,11 @@ const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
               <DisplayNumber
                 :value="item.wins"
                 :options="{ maximumFractionDigits: 1 }"
-              />W ·
+              />{{ t('leaderboard.wins') }} ·
               <DisplayNumber
                 :value="item.losses"
                 :options="{ maximumFractionDigits: 1 }"
-              />L
+              />{{ t('leaderboard.losses') }}
             </div>
           </div>
         </div>
@@ -190,7 +195,7 @@ const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
     <div class="px-4 py-2 border-t border-base">
       <span class="text-mini color-faint flex gap-1.5 items-center">
         <span class="i-carbon-information" aria-hidden="true" />
-        Win rate counts finished matches only
+        {{ t('leaderboard.winRateNote') }}
       </span>
     </div>
   </div>

@@ -6,7 +6,6 @@ import { TWENTY_FOUR_QUESTIONS } from '#shared/24-point'
 import { getGame } from '#shared/games'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
-import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
 import DisplayDuration from '@antfu/design/components/Display/DisplayDuration.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
@@ -16,6 +15,8 @@ import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 const props = defineProps<{
   room: Room | null
 }>()
+
+const { t } = useAppI18n()
 
 const OPERATORS = ['+', '−', '×', '÷'] as const
 
@@ -125,13 +126,13 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
       <div class="flex gap-2 min-w-0 items-center">
         <DisplayBadge
           icon="i-carbon-flag"
-          text="Race"
+          :text="t('24.race')"
           color="primary"
           rounded="full"
           class="shrink-0"
         />
         <span class="text-mini color-muted truncate">
-          Your clock starts when you call start-game; shortest time to solve all six questions wins
+          {{ t('24.hint') }}
         </span>
       </div>
     </div>
@@ -164,7 +165,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 </span>
                 <DisplayBadge
                   v-if="panel.player && room?.status === 'finished' && panel.player.sessionId === room.winner"
-                  text="Winner"
+                  :text="t('common.winner')"
                   color="success"
                   rounded="full"
                   class="shrink-0"
@@ -176,26 +177,32 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 :harness="panel.player.harness"
               />
               <div v-else class="text-mini color-muted leading-tight font-mono truncate">
-                Waiting
+                {{ t('status.waiting') }}
               </div>
             </div>
           </div>
           <div v-if="panel.player" class="flex shrink-0 flex-col gap-1 items-end">
             <DisplayBadge
-              :text="`Solved ${panel.solved}/${TWENTY_FOUR_QUESTIONS}`"
+              :text="t('24.solved', {
+                solved: panel.solved,
+                total: TWENTY_FOUR_QUESTIONS,
+              })"
               :color="panel.solved >= TWENTY_FOUR_QUESTIONS ? 'success' : panel.badgeColor"
               rounded="full"
               class="text-mini"
             />
             <span class="text-mini color-faint font-mono">
-              <DisplayNumber :value="panel.attempts" suffix=" attempts" />
+              <DisplayNumber
+                :value="panel.attempts"
+                :suffix="t('24.attempts', { count: panel.attempts })"
+              />
               <span class="mx-1.5 op-fade" aria-hidden="true">·</span>
               <template v-if="panel.timeMs !== null">
                 <span class="i-carbon-time" aria-hidden="true" />
                 <DisplayDuration :ms="panel.timeMs" :colorize="true" />
               </template>
               <template v-else>
-                Did not finish
+                {{ t('24.didNotFinish') }}
               </template>
             </span>
           </div>
@@ -205,14 +212,14 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
           <FeedbackEmptyState
             v-if="!panel.player"
             icon="i-carbon-user-avatar"
-            title="Waiting for an agent"
+            :title="t('common.waitingForAgent')"
             class="flex-1"
           />
           <template v-else>
             <div class="flex gap-2 items-center justify-between">
               <div class="flex gap-2 min-w-0 items-center">
                 <span class="text-mini color-muted tracking-wide font-medium uppercase">
-                  Question
+                  {{ t('24.question') }}
                 </span>
                 <DisplayNumberBadge
                   :value="panel.viewedQuestion"
@@ -225,8 +232,8 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
               </div>
               <DisplayBadge
                 :text="panel.solved >= TWENTY_FOUR_QUESTIONS
-                  ? 'Done'
-                  : panel.isCurrent ? 'Current' : 'Viewing'"
+                  ? t('24.done')
+                  : panel.isCurrent ? t('24.current') : t('24.viewing')"
                 :color="panel.solved >= TWENTY_FOUR_QUESTIONS
                   ? 'success'
                   : panel.isCurrent ? panel.badgeColor : false"
@@ -235,7 +242,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
               />
             </div>
 
-            <div class="flex gap-1.5" aria-label="Question progress">
+            <div class="flex gap-1.5" :aria-label="t('24.questionProgress')">
               <button
                 v-for="question in TWENTY_FOUR_QUESTIONS"
                 :key="question"
@@ -243,7 +250,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 class="rounded-full flex-1 h-2.5 cursor-pointer transition-all hover:op-80 focus-visible:ring-2 focus-visible:ring-primary-500/40"
                 :class="questionDotClass(panel, question)"
                 :aria-pressed="panel.viewedQuestion === question"
-                :aria-label="`Show question ${question}`"
+                :aria-label="t('24.showQuestion', { count: question })"
                 @click="viewQuestion(panel.side.key, question)"
               />
             </div>
@@ -288,7 +295,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
               <div class="px-3 py-2 border-b border-base flex gap-2 items-center justify-between">
                 <h3 class="text-sm font-medium flex gap-1.5 items-center">
                   <span class="i-carbon-list-boxes color-muted" aria-hidden="true" />
-                  Attempt log
+                  {{ t('24.attemptLog') }}
                   <DisplayBadge
                     :text="`Q${panel.viewedQuestion}`"
                     :color="false"
@@ -306,7 +313,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                     <div class="flex shrink-0 flex-col gap-1.5 items-center">
                       <DisplayNumberBadge :value="index + 1" prefix="#" class="shrink-0" />
                       <DisplayBadge
-                        :text="event.payload?.correct ? 'Correct' : 'Wrong'"
+                        :text="event.payload?.correct ? t('log.correct') : t('log.wrong')"
                         :color="event.payload?.correct ? 'success' : 'error'"
                         rounded="full"
                         class="text-mini shrink-0"
@@ -317,7 +324,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                         <div class="text-sm font-medium font-mono min-w-0 break-words">
                           {{ event.payload?.expression ?? event.payload?.move }}
                         </div>
-                        <DisplayDate
+                        <AppDate
                           :date="event.at"
                           :live="room?.status === 'playing'"
                           class="text-mini color-faint mt-0.5 shrink-0"
@@ -341,7 +348,7 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
                 <FeedbackEmptyState
                   v-else
                   icon="i-carbon-activity"
-                  title="No attempts yet"
+                  :title="t('24.noAttempts')"
                 />
               </div>
             </div>

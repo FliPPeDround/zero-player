@@ -53,6 +53,7 @@
     "@nuxt/eslint": "catalog:build",
     "@nuxthub/core": "catalog:server",
     "@nuxtjs/color-mode": "catalog:build",
+    "@nuxtjs/i18n": "^10.6.0",
     "@nuxtjs/mcp-toolkit": "catalog:mcp",
     "@types/node": "catalog:dev",
     "@unocss/eslint-config": "catalog:build",

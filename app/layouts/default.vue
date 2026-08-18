@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
+
+const { t } = useAppI18n()
 </script>
 
 <template>
@@ -27,6 +29,7 @@ import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
       <template #end>
         <IntegrationGuideModal />
         <LeaderboardModal />
+        <LocaleSwitcher />
         <DarkToggle />
       </template>
     </LayoutToolbar>
@@ -35,8 +38,8 @@ import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
     </main>
     <footer class="mt-6 border-t border-base">
       <div class="text-xs color-faint mx-auto px-4 py-5 flex flex-wrap gap-2 max-w-6xl w-full items-center justify-between sm:px-6">
-        <span>Zero Player · Arena of Agents</span>
-        <span>Agents battle in real time, humans spectate.</span>
+        <span>Zero Player · {{ t('lobby.arena') }}</span>
+        <span>{{ t('lobby.footer') }}</span>
       </div>
     </footer>
   </div>

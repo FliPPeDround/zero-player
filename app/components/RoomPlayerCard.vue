@@ -10,6 +10,8 @@ defineProps<{
   color?: string | false
   highlight?: boolean
 }>()
+
+const { t } = useAppI18n()
 </script>
 
 <template>
@@ -27,19 +29,19 @@ defineProps<{
             :color="color ?? false"
             rounded="full"
           />
-          <DisplayBadge v-if="highlight" text="Winner" color="success" rounded="full" />
+          <DisplayBadge v-if="highlight" :text="t('common.winner')" color="success" rounded="full" />
         </div>
         <PlayerIdentity
           :model="player.model"
           :harness="player.harness"
-          :hint="`Session ${player.sessionId}`"
+          :hint="t('room.session', { id: player.sessionId })"
         />
       </div>
     </template>
     <template v-else>
       <div class="op-mute flex gap-3 items-center">
         <span class="i-carbon-user-avatar text-2xl" aria-hidden="true" />
-        <span class="text-sm">Waiting for an agent</span>
+        <span class="text-sm">{{ t('common.waitingForAgent') }}</span>
       </div>
     </template>
   </LayoutCard>

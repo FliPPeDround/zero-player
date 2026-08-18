@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { GameSide } from '#shared/games'
 import type { RoomSummary } from '#shared/rooms'
-import { getGame, getGameName } from '#shared/games'
+import { getGame } from '#shared/games'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
-import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayProgressBar from '@antfu/design/components/Display/DisplayProgressBar.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
@@ -13,45 +12,45 @@ const props = defineProps<{
   room: RoomSummary
 }>()
 
-const gameName = computed(() => getGameName(props.room.gameId))
+const { t, gameName } = useAppI18n()
 const gameIcon = computed(() => getGame(props.room.gameId)?.icon)
 
-const statusMeta: Record<RoomSummary['status'], {
+const statusMeta = computed<Record<RoomSummary['status'], {
   color: string | false
   label: string
   icon: string
   accent: string
   progress: string
-}> = {
+}>>(() => ({
   waiting: {
     color: 'warning',
-    label: 'Waiting',
+    label: t('status.waiting'),
     icon: 'i-carbon-time',
     accent: 'bg-warning-400',
     progress: 'bg-warning-500',
   },
   playing: {
     color: 'success',
-    label: 'Playing',
+    label: t('status.playing'),
     icon: 'i-carbon-play',
     accent: 'bg-success-500',
     progress: 'bg-success-500',
   },
   finished: {
     color: false,
-    label: 'Finished',
+    label: t('status.finished'),
     icon: 'i-carbon-checkmark',
     accent: 'bg-hover',
     progress: 'bg-hover',
   },
   aborted: {
     color: 'error',
-    label: 'Aborted',
+    label: t('status.aborted'),
     icon: 'i-carbon-stop-outline',
     accent: 'bg-error-400',
     progress: 'bg-error-500',
   },
-}
+}))
 
 const slots = computed<Array<{ side: GameSide, player: RoomSummary['players'][number] | null }>>(() => {
   const sides = getGame(props.room.gameId)?.sides ?? []
@@ -69,19 +68,19 @@ const fillRatio = computed(() => {
 const dateInfo = computed(() => {
   const { status, updatedAt, startedAt, finishedAt } = props.room
   if (status === 'playing')
-    return { label: 'Started', date: startedAt ?? updatedAt }
+    return { label: t('room.started'), date: startedAt ?? updatedAt }
   if (status === 'finished')
-    return { label: 'Finished', date: finishedAt ?? updatedAt }
+    return { label: t('room.finished'), date: finishedAt ?? updatedAt }
   if (status === 'aborted')
-    return { label: 'Aborted', date: props.room.abortedAt ?? updatedAt }
-  return { label: 'Updated', date: updatedAt }
+    return { label: t('room.aborted'), date: props.room.abortedAt ?? updatedAt }
+  return { label: t('room.updated'), date: updatedAt }
 })
 
 const closesInLabel = computed(() => {
   if (!props.room.closesAt)
     return null
   const minutes = Math.max(1, Math.ceil((new Date(props.room.closesAt).getTime() - Date.now()) / 60_000))
-  return `Closes in ~${minutes}m`
+  return t('room.closesIn', { count: minutes })
 })
 </script>
 
@@ -98,7 +97,7 @@ const closesInLabel = computed(() => {
     <NuxtLink
       :to="`/rooms/${room.id}`"
       class="outline-none rounded-xl inset-0 absolute focus-visible:ring-2 focus-visible:ring-primary-500/40"
-      :aria-label="`Enter room ${room.name}`"
+      :aria-label="t('room.enterAria', { name: room.name })"
     >
       <span class="sr-only">{{ room.name }}</span>
     </NuxtLink>
@@ -117,12 +116,12 @@ const closesInLabel = computed(() => {
     </div>
 
     <div class="flex gap-2 min-w-0 items-center">
-      <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" class="text-mini shrink-0" />
+      <DisplayBadge :text="gameName(room.gameId)" :color="false" :icon="gameIcon" class="text-mini shrink-0" />
       <span class="text-mini color-faint font-mono truncate">{{ room.id }}</span>
       <CopyButton
         :text="room.id"
-        tooltip="Copy room id"
-        label="Copy room id"
+        :tooltip="t('room.copyId')"
+        :label="t('room.copyId')"
         class="z-1 shrink-0 relative"
       />
     </div>
@@ -148,7 +147,7 @@ const closesInLabel = computed(() => {
             {{ entry.player.nickname }}
           </span>
           <span v-else class="text-xs color-faint">
-            Waiting for an agent
+            {{ t('common.waitingForAgent') }}
           </span>
           <span v-if="entry.player" class="text-mini color-faint font-mono truncate">
             {{ entry.player.model }}
@@ -174,7 +173,7 @@ const closesInLabel = computed(() => {
       </template>
       <span v-else class="text-mini color-muted flex gap-1 items-center">
         <span class="i-carbon-user-avatar" aria-hidden="true" />
-        Waiting for players
+        {{ t('common.waitingForPlayers') }}
       </span>
     </div>
 
@@ -183,7 +182,7 @@ const closesInLabel = computed(() => {
         <DisplayNumber :value="room.playerCount" />/{{ room.maxPlayers }}
         <template v-if="room.status === 'waiting'">
           <span class="mx-1 op-fade" aria-hidden="true">·</span>
-          ready {{ room.readyCount ?? 0 }}
+          {{ t('rooms.ready', { count: room.readyCount ?? 0 }) }}
         </template>
       </span>
       <DisplayProgressBar
@@ -198,7 +197,7 @@ const closesInLabel = computed(() => {
       <span class="text-mini color-muted flex gap-1 min-w-0 items-center">
         <span :class="statusMeta[room.status].icon" aria-hidden="true" />
         <span class="shrink-0">{{ dateInfo.label }}</span>
-        <DisplayDate
+        <AppDate
           :date="dateInfo.date"
           :colorize="true"
           :live="room.status === 'playing'"

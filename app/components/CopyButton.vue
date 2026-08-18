@@ -7,23 +7,28 @@ const props = withDefaults(defineProps<{
   label?: string
   tooltip?: string
 }>(), {
-  label: 'Copy',
-  tooltip: 'Copy',
+  label: '',
+  tooltip: '',
 })
+
+const { t } = useAppI18n()
 
 const { copy, copied } = useClipboard({
   source: () => props.text,
   copiedDuring: 1500,
   legacy: true,
 })
+
+const tooltipText = computed(() => props.tooltip || t('common.copy'))
+const labelText = computed(() => props.label || t('common.copy'))
 </script>
 
 <template>
   <ActionIconButton
     compact
     :icon="copied ? 'i-carbon-checkmark' : 'i-carbon-copy'"
-    :tooltip="copied ? 'Copied' : tooltip"
-    :label="`${label} ${text}`"
+    :tooltip="copied ? t('common.copied') : tooltipText"
+    :label="`${labelText} ${text}`"
     class="text-micro"
     @click="copy()"
   />

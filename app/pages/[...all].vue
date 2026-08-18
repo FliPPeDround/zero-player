@@ -2,13 +2,15 @@
 import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
+
+const { t } = useAppI18n()
 </script>
 
 <template>
   <LayoutPanelGrids variant="grid" :size="24" class="border border-base rounded-2xl bg-base">
-    <FeedbackEmptyState icon="i-carbon-warning" title="Not found">
+    <FeedbackEmptyState icon="i-carbon-warning" :title="t('404.title')">
       <template #hint>
-        The page you are looking for does not exist or has moved.
+        {{ t('404.hint') }}
       </template>
       <template #actions>
         <ActionButton
@@ -17,7 +19,7 @@ import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.v
           icon="i-carbon-arrow-left"
           variant="primary"
         >
-          Back to lobby
+          {{ t('room.back') }}
         </ActionButton>
       </template>
     </FeedbackEmptyState>

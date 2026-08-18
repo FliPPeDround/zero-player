@@ -3,7 +3,6 @@ import type { Room, RoomEvent } from '#shared/rooms'
 import { getGame } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
-import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
@@ -13,6 +12,8 @@ const props = defineProps<{
   winnerNickname?: string
 }>()
 
+const { t } = useAppI18n()
+
 const gameSides = computed(() => getGame(props.room?.gameId ?? '')?.sides ?? [])
 
 function moveLabel(payload: Record<string, unknown>): string {
@@ -21,7 +22,7 @@ function moveLabel(payload: Record<string, unknown>): string {
   if (payload.type === 'bid' && typeof payload.count === 'number' && typeof payload.face === 'number')
     return `${payload.count}×${payload.face}`
   if (payload.type === 'call')
-    return 'Call'
+    return t('log.call')
   return ''
 }
 
@@ -33,16 +34,16 @@ function liarDiceLoserName(payload: Record<string, unknown>): string {
   return props.room?.players.find(player => player.slot === side)?.nickname ?? ''
 }
 
-const eventMeta: Record<RoomEvent['type'], { label: string, icon: string }> = {
-  player_joined: { label: 'Joined', icon: 'i-carbon-user-follow' },
-  player_left: { label: 'Left', icon: 'i-carbon-user-minus' },
-  player_ready: { label: 'Ready', icon: 'i-carbon-checkmark' },
-  game_started: { label: 'Game started', icon: 'i-carbon-play' },
-  move: { label: 'Move', icon: 'i-carbon-move' },
-  game_finished: { label: 'Game finished', icon: 'i-carbon-flag' },
-  game_aborted: { label: 'Game aborted', icon: 'i-carbon-stop-outline' },
-  room_closed: { label: 'Room closed', icon: 'i-carbon-close-outline' },
-}
+const eventMeta = computed<Record<RoomEvent['type'], { label: string, icon: string }>>(() => ({
+  player_joined: { label: t('log.joined'), icon: 'i-carbon-user-follow' },
+  player_left: { label: t('log.left'), icon: 'i-carbon-user-minus' },
+  player_ready: { label: t('log.ready'), icon: 'i-carbon-checkmark' },
+  game_started: { label: t('log.gameStarted'), icon: 'i-carbon-play' },
+  move: { label: t('log.move'), icon: 'i-carbon-move' },
+  game_finished: { label: t('log.gameFinished'), icon: 'i-carbon-flag' },
+  game_aborted: { label: t('log.gameAborted'), icon: 'i-carbon-stop-outline' },
+  room_closed: { label: t('log.roomClosed'), icon: 'i-carbon-close-outline' },
+}))
 
 /**
  * Lifecycle events render as full-width marker bands that split the feed into
@@ -63,10 +64,10 @@ const moveNumbers = computed(() => {
 
 function chatterVerb(event: RoomEvent): string {
   if (event.type === 'player_joined')
-    return 'joined'
+    return t('log.joinedVerb')
   if (event.type === 'player_left')
-    return 'left'
-  return eventMeta[event.type].label
+    return t('log.leftVerb')
+  return eventMeta.value[event.type].label
 }
 
 /** Every event carries the mover's seat (`payload.side`), so the avatar tint is a direct lookup. */
@@ -99,7 +100,7 @@ watch(() => props.room?.events.length, () => {
     <div class="px-3 py-2 border-b border-base flex items-center">
       <div class="flex gap-2 items-center">
         <h2 class="text-sm font-medium">
-          Battle log
+          {{ t('log.title') }}
         </h2>
         <DisplayNumberBadge :value="room?.events.length ?? 0" />
       </div>
@@ -156,7 +157,7 @@ watch(() => props.room?.events.length, () => {
                     </span>
                   </template>
                   <span class="flex-1" aria-hidden="true" />
-                  <DisplayDate
+                  <AppDate
                     :date="event.at"
                     :live="room?.status === 'playing'"
                     class="text-mini color-faint shrink-0"
@@ -167,7 +168,7 @@ watch(() => props.room?.events.length, () => {
                   class="text-mini color-muted font-mono mt-0.5 tabular-nums"
                 >
                   Q{{ event.payload.question ?? '?' }} ·
-                  {{ event.payload.correct ? 'Correct' : 'Wrong' }}
+                  {{ event.payload.correct ? t('log.correct') : t('log.wrong') }}
                   <template v-if="typeof event.payload.feedback === 'string' && event.payload.feedback">
                     · {{ event.payload.feedback }}
                   </template>
@@ -176,9 +177,9 @@ watch(() => props.room?.events.length, () => {
                   v-if="event.payload.type === 'call' && typeof event.payload.total === 'number'"
                   class="text-mini color-muted font-mono mt-0.5 tabular-nums"
                 >
-                  {{ event.payload.correct ? 'Held' : 'Bluff' }} · total {{ event.payload.total }}
+                  {{ event.payload.correct ? t('log.held') : t('log.bluff') }} · {{ t('log.total', { count: event.payload.total }) }}
                   <template v-if="liarDiceLoserName(event.payload)">
-                    · {{ liarDiceLoserName(event.payload) }} loses a die
+                    · {{ t('log.losesDie', { name: liarDiceLoserName(event.payload) }) }}
                   </template>
                 </div>
                 <p
@@ -205,14 +206,14 @@ watch(() => props.room?.events.length, () => {
                     :class="winnerDotClass"
                     aria-hidden="true"
                   />
-                  <span class="color-base font-medium">{{ winnerNickname ? `${winnerNickname} won` : 'Draw' }}</span>
+                  <span class="color-base font-medium">{{ winnerNickname ? t('log.won', { name: winnerNickname }) : t('room.draw') }}</span>
                   <span v-if="room?.game?.finishReason" class="text-mini color-faint font-mono"> · {{ room.game.finishReason }}</span>
                 </template>
                 <template v-else>
                   {{ eventMeta[event.type].label }}
                 </template>
               </p>
-              <DisplayDate
+              <AppDate
                 :date="event.at"
                 :live="room?.status === 'playing'"
                 class="text-mini color-faint shrink-0"
@@ -229,7 +230,7 @@ watch(() => props.room?.events.length, () => {
               <p class="color-muted flex-1 min-w-0 truncate">
                 <span v-if="event.actor" class="color-base font-medium">{{ event.actor }}</span> {{ chatterVerb(event) }}
               </p>
-              <DisplayDate
+              <AppDate
                 :date="event.at"
                 :live="room?.status === 'playing'"
                 class="color-faint shrink-0"
@@ -240,7 +241,7 @@ watch(() => props.room?.events.length, () => {
         <FeedbackEmptyState
           v-else
           icon="i-carbon-activity"
-          title="No events yet"
+          :title="t('log.noEvents')"
         />
       </div>
     </div>

@@ -5,8 +5,6 @@ import type { Room, RoomPlayer } from '#shared/rooms'
 import { getGame } from '#shared/games'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
-import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
-import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import FeedbackSpinner from '@antfu/design/components/Feedback/FeedbackSpinner.vue'
@@ -15,6 +13,8 @@ import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 const props = defineProps<{
   room: Room | null
 }>()
+
+const { t } = useAppI18n()
 
 /** Pip positions on a 3x3 grid (row-major 0-8) for each die face. */
 const PIPS: Record<number, number[]> = {
@@ -240,10 +240,10 @@ const turnPlayer = computed(() => {
 
 const bidLabel = computed(() => {
   if (props.room?.status === 'finished')
-    return 'Final bid'
+    return t('ld.finalBid')
   if (props.room?.status === 'aborted')
-    return 'Match over'
-  return 'Current bid'
+    return t('ld.matchOver')
+  return t('ld.currentBid')
 })
 
 const roundsRef = ref<HTMLElement | null>(null)
@@ -259,7 +259,7 @@ function hasPip(face: number, cell: number): boolean {
 }
 
 function dieTitle(nickname: string, index: number): string {
-  return nickname ? `${nickname}'s die ${index + 1}` : ''
+  return nickname ? t('ld.dieTitle', { name: nickname, count: index + 1 }) : ''
 }
 </script>
 
@@ -269,19 +269,23 @@ function dieTitle(nickname: string, index: number): string {
       <div class="flex gap-2 min-w-0 items-center">
         <DisplayBadge
           icon="i-carbon-shuffle"
-          text="Bluff"
+          :text="t('ld.bluff')"
           color="primary"
           rounded="full"
           class="shrink-0"
         />
         <span class="text-mini color-muted truncate">
-          Bid, raise or call; 1s are wild
+          {{ t('ld.hint') }}
         </span>
       </div>
       <span class="text-mini color-muted flex shrink-0 gap-1.5 items-center">
         <span class="i-carbon-calendar" aria-hidden="true" />
-        Round
-        <DisplayNumberBadge :value="roundNumber" class="shrink-0" />
+        <DisplayNumberBadge
+          :value="roundNumber"
+          :prefix="t('ld.roundPrefix')"
+          :suffix="t('ld.roundSuffix')"
+          class="shrink-0"
+        />
       </span>
     </div>
 
@@ -298,7 +302,7 @@ function dieTitle(nickname: string, index: number): string {
             {{ currentBid.count }}×{{ currentBid.face }}
           </span>
           <span v-else class="text-sm color-faint font-mono">
-            Opening bid
+            {{ t('ld.openingBid') }}
           </span>
         </div>
         <span
@@ -306,7 +310,9 @@ function dieTitle(nickname: string, index: number): string {
           class="text-mini color-muted flex shrink-0 gap-1.5 items-center"
         >
           <span class="rounded-full bg-primary-500 h-1.5 w-1.5" aria-hidden="true" />
-          {{ currentBid ? `${turnPlayer.nickname} to raise or call` : `${turnPlayer.nickname} opens the bidding` }}
+          {{ currentBid
+            ? t('ld.toRaiseOrCall', { name: turnPlayer.nickname })
+            : t('ld.opensBidding', { name: turnPlayer.nickname }) }}
         </span>
       </div>
 
@@ -322,26 +328,27 @@ function dieTitle(nickname: string, index: number): string {
                 <DisplayNumberBadge
                   v-if="room?.game"
                   :value="round.roundNumber"
-                  prefix="Round "
+                  :prefix="t('ld.roundPrefix')"
+                  :suffix="t('ld.roundSuffix')"
                   class="shrink-0"
                 />
                 <template v-if="room?.game">
                   <span class="text-mini color-muted truncate">
-                    {{ round.opener?.nickname ?? 'Someone' }} opens
+                    {{ t('ld.opens', { name: round.opener?.nickname ?? t('ld.someone') }) }}
                   </span>
                 </template>
                 <span v-else class="text-mini color-muted truncate">
-                  Waiting for agents
+                  {{ t('ld.waitingForAgents') }}
                 </span>
               </div>
               <div v-if="round.call" class="flex shrink-0 gap-2 items-center">
                 <DisplayBadge
-                  :text="round.call.correct ? 'Held' : 'Bluff'"
+                  :text="round.call.correct ? t('log.held') : t('log.bluff')"
                   :color="round.call.correct ? 'warning' : 'success'"
                   rounded="full"
                   class="text-mini"
                 />
-                <DisplayDate
+                <AppDate
                   :date="round.call.at"
                   :live="room?.status === 'playing' && round.isCurrent"
                   class="text-mini color-faint"
@@ -388,7 +395,7 @@ function dieTitle(nickname: string, index: number): string {
                         </span>
                         <DisplayBadge
                           v-if="hand.isWinner"
-                          text="Winner"
+                          :text="t('common.winner')"
                           color="success"
                           rounded="full"
                           class="shrink-0"
@@ -400,14 +407,14 @@ function dieTitle(nickname: string, index: number): string {
                         :harness="hand.player.harness"
                       />
                       <div v-else class="text-mini color-muted leading-tight font-mono truncate">
-                        Waiting
+                        {{ t('status.waiting') }}
                       </div>
                     </div>
                   </div>
                   <div v-if="hand.player" class="flex shrink-0 gap-1.5 items-center">
                     <template v-if="hand.side.key === sides[0]?.key">
                       <span class="text-mini color-faint font-mono whitespace-nowrap">
-                        dice
+                        {{ t('ld.dice') }}
                       </span>
                       <DisplayNumberBadge
                         :value="hand.diceCount"
@@ -422,7 +429,7 @@ function dieTitle(nickname: string, index: number): string {
                         class="shrink-0"
                       />
                       <span class="text-mini color-faint font-mono whitespace-nowrap">
-                        dice
+                        {{ t('ld.dice') }}
                       </span>
                     </template>
                   </div>
@@ -431,7 +438,7 @@ function dieTitle(nickname: string, index: number): string {
                 <div
                   v-if="hand.player && hand.dice.length"
                   class="flex flex-1 flex-wrap gap-2 items-center justify-center"
-                  aria-label="Dice"
+                  :aria-label="t('ld.diceAria')"
                 >
                   <div
                     v-for="(die, index) in hand.dice"
@@ -441,7 +448,7 @@ function dieTitle(nickname: string, index: number): string {
                       ? 'bg-active border border-active ring-1 ring-primary-500/40 color-active'
                       : 'bg-base border border-base color-base'"
                     :title="die === 1
-                      ? 'Wild: counts as any face'
+                      ? t('ld.wildTitle')
                       : dieTitle(hand.player?.nickname ?? '', index)"
                   >
                     <span
@@ -469,13 +476,13 @@ function dieTitle(nickname: string, index: number): string {
                   v-else-if="!hand.player"
                   class="text-compact color-faint font-mono flex-1 grid place-items-center"
                 >
-                  Waiting for an agent
+                  {{ t('common.waitingForAgent') }}
                 </div>
                 <div
                   v-else
                   class="text-compact color-faint font-mono flex-1 grid place-items-center"
                 >
-                  Dice are in the cup
+                  {{ t('ld.diceInCup') }}
                 </div>
               </div>
             </div>
@@ -488,7 +495,7 @@ function dieTitle(nickname: string, index: number): string {
                 v-if="round.actions.length"
                 class="text-mini color-muted tracking-wide font-medium uppercase"
               >
-                Actions
+                {{ t('ld.actions') }}
               </h3>
               <div
                 v-for="(action, actionIndex) in round.actions"
@@ -498,7 +505,7 @@ function dieTitle(nickname: string, index: number): string {
                 <div class="flex justify-start">
                   <DisplayAvatar
                     v-if="action.player?.slot === sides[0]?.key"
-                    :name="action.player?.nickname ?? 'Agent'"
+                    :name="action.player?.nickname ?? t('ld.agent')"
                     :size="24"
                     class="shrink-0"
                     :class="[playerAvatarClass(action.player)]"
@@ -509,7 +516,7 @@ function dieTitle(nickname: string, index: number): string {
                     class="text-mini color-base font-medium mb-1 truncate"
                     :class="action.player?.slot === sides[0]?.key ? 'text-left' : 'text-right'"
                   >
-                    {{ action.player?.nickname ?? 'Agent' }}
+                    {{ action.player?.nickname ?? t('ld.agent') }}
                   </div>
                   <div
                     class="px-3 py-2 border border-base rounded-xl bg-secondary flex flex-col gap-1"
@@ -524,7 +531,7 @@ function dieTitle(nickname: string, index: number): string {
                       :class="action.player?.slot === sides[0]?.key ? '' : 'justify-end'"
                     >
                       <DisplayBadge
-                        :text="action.kind === 'bid' ? 'Bid' : 'Call'"
+                        :text="action.kind === 'bid' ? t('ld.bid') : t('log.call')"
                         :color="action.kind === 'bid' ? 'primary' : 'warning'"
                         rounded="full"
                         class="text-mini shrink-0"
@@ -541,7 +548,7 @@ function dieTitle(nickname: string, index: number): string {
                 <div class="flex justify-end">
                   <DisplayAvatar
                     v-if="action.player?.slot !== sides[0]?.key"
-                    :name="action.player?.nickname ?? 'Agent'"
+                    :name="action.player?.nickname ?? t('ld.agent')"
                     :size="24"
                     class="shrink-0"
                     :class="[playerAvatarClass(action.player)]"
@@ -574,7 +581,7 @@ function dieTitle(nickname: string, index: number): string {
                     :class="turnPlayer.slot === sides[0]?.key ? '' : 'ml-auto justify-end items-center text-right'"
                   >
                     <FeedbackSpinner class="shrink-0" />
-                    <span class="text-mini color-muted">Thinking…</span>
+                    <span class="text-mini color-muted">{{ t('ld.thinking') }}</span>
                   </div>
                 </div>
                 <div class="flex justify-end">
@@ -599,15 +606,18 @@ function dieTitle(nickname: string, index: number): string {
                 aria-hidden="true"
               />
               <p class="text-compact color-base text-center min-w-0">
-                <span class="font-medium">{{ round.call.loser?.nickname ?? 'The loser' }} loses 1 die</span>
-                — {{ round.call.bidder?.nickname ?? 'The bidder' }}'s
-                <span class="font-mono font-semibold tabular-nums">{{ round.call.count }}×{{ round.call.face }}</span>
-                was {{ round.call.correct ? 'held' : 'a bluff' }}
+                <span class="font-medium">{{ t('ld.losesDie', { name: round.call.loser?.nickname ?? t('ld.loser') }) }}</span>
+                —
+                <span class="font-medium">
+                  {{ round.call.correct
+                    ? t('ld.wasHeld', { bidder: round.call.bidder?.nickname ?? t('ld.bidder'), count: round.call.count, face: round.call.face })
+                    : t('ld.wasBluff', { bidder: round.call.bidder?.nickname ?? t('ld.bidder'), count: round.call.count, face: round.call.face }) }}
+                </span>
                 <template v-if="round.call.correct">
-                  (actual total <DisplayNumber :value="round.call.total" />)
+                  {{ t('ld.actualTotal', { count: round.call.total }) }}
                 </template>
                 <template v-else>
-                  (only <DisplayNumber :value="round.call.total" /> found)
+                  {{ t('ld.onlyFound', { count: round.call.total }) }}
                 </template>
               </p>
             </div>
@@ -616,7 +626,7 @@ function dieTitle(nickname: string, index: number): string {
         <FeedbackEmptyState
           v-else
           icon="i-carbon-activity"
-          title="No rounds yet"
+          :title="t('ld.noRounds')"
         />
       </div>
     </LayoutCard>

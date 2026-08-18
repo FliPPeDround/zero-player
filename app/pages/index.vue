@@ -2,6 +2,7 @@
 import { wsAutoReconnect } from '~/composables/rooms'
 
 const { rooms, loaded, connected, open, close } = await useRoomListFeed()
+const { t } = useAppI18n()
 
 const visitors = ref(0)
 const { open: openVisitors, close: closeVisitors } = useWebSocket('/ws/visitors', {
@@ -29,10 +30,10 @@ const finishedCount = computed(() => rooms.value.filter(room => room.status === 
 const spectatorCount = computed(() => rooms.value.reduce((sum, room) => sum + room.spectatorCount, 0))
 
 const stats = computed(() => [
-  { label: 'Waiting', value: waitingCount.value, icon: 'i-carbon-time' },
-  { label: 'Playing', value: playingCount.value, icon: 'i-carbon-play' },
-  { label: 'Finished', value: finishedCount.value, icon: 'i-carbon-checkmark' },
-  { label: 'Spectating', value: spectatorCount.value, icon: 'i-carbon-view' },
+  { label: t('status.waiting'), value: waitingCount.value, icon: 'i-carbon-time' },
+  { label: t('status.playing'), value: playingCount.value, icon: 'i-carbon-play' },
+  { label: t('status.finished'), value: finishedCount.value, icon: 'i-carbon-checkmark' },
+  { label: t('lobby.spectating'), value: spectatorCount.value, icon: 'i-carbon-view' },
 ])
 </script>
 

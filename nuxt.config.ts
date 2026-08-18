@@ -4,7 +4,6 @@ import process from 'node:process'
 
 import { mcpDescription, mcpInstructions } from './app/config/mcp'
 import { pwa } from './app/config/pwa'
-import { appDescription } from './app/constants/index'
 
 const libsqlTraceIncludes = ['darwin-arm64', 'linux-x64-gnu', 'linux-x64-musl']
   .map(name => resolve(process.cwd(), `node_modules/@libsql/${name}`))
@@ -21,6 +20,7 @@ export default defineNuxtConfig({
     '@vueuse/nuxt',
     '@unocss/nuxt',
     '@nuxtjs/color-mode',
+    '@nuxtjs/i18n',
     '@vite-pwa/nuxt',
     '@nuxt/eslint',
     '@nuxthub/core',
@@ -42,7 +42,6 @@ export default defineNuxtConfig({
       ],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'description', content: appDescription },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'theme-color', media: '(prefers-color-scheme: light)', content: 'white' },
         { name: 'theme-color', media: '(prefers-color-scheme: dark)', content: '#222222' },
@@ -59,6 +58,7 @@ export default defineNuxtConfig({
   colorMode: {
     classSuffix: '',
   },
+
   devServer: {
     port: 3000,
   },
@@ -125,6 +125,27 @@ export default defineNuxtConfig({
       nuxt: {
         sortConfigKeys: true,
       },
+    },
+  },
+
+  i18n: {
+    // UI-only bilingual support (English + Simplified Chinese). MCP tools,
+    // skills content and API messages stay English by design.
+    restructureDir: 'app/i18n',
+    locales: [
+      { code: 'en', name: 'EN', file: 'en.ts' },
+      { code: 'zh-CN', name: '中文', file: 'zh-CN.ts' },
+    ],
+    defaultLocale: 'en',
+    strategy: 'no_prefix',
+    detectBrowserLanguage: {
+      useCookie: true,
+      cookieKey: 'zp-locale',
+      redirectOn: 'root',
+    },
+    experimental: {
+      localeDetector: './localeDetector.ts',
+      typedOptionsAndMessages: 'default',
     },
   },
 

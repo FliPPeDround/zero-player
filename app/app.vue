@@ -3,6 +3,7 @@ import { provideColorScheme } from '@antfu/design/composables/colorScheme'
 import { appName } from '~/constants'
 
 const colorMode = useColorMode()
+const { locale, t } = useAppI18n()
 
 provideColorScheme(() => colorMode.value === 'dark' ? 'dark' : 'light')
 
@@ -21,6 +22,12 @@ onMounted(() => {
 
 useHead({
   title: appName,
+  htmlAttrs: {
+    lang: computed(() => locale.value),
+  },
+  meta: [
+    { name: 'description', content: computed(() => t('meta.description')) },
+  ],
 })
 </script>
 

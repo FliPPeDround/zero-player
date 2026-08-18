@@ -17,6 +17,8 @@ const props = defineProps<{
   connected: boolean
 }>()
 
+const { t, gameName } = useAppI18n()
+
 const PAGE_SIZE = 12
 
 const search = ref('')
@@ -28,11 +30,11 @@ const finishedCount = computed(() => props.rooms.filter(room => room.status === 
 const abortedCount = computed(() => props.rooms.filter(room => room.status === 'aborted').length)
 
 const statusTabs = computed(() => [
-  { value: 'all', label: 'All', count: props.rooms.length },
-  { value: 'waiting', label: 'Waiting', count: waitingCount.value },
-  { value: 'playing', label: 'Playing', count: playingCount.value },
-  { value: 'finished', label: 'Finished', count: finishedCount.value },
-  { value: 'aborted', label: 'Aborted', count: abortedCount.value },
+  { value: 'all', label: t('status.all'), count: props.rooms.length },
+  { value: 'waiting', label: t('status.waiting'), count: waitingCount.value },
+  { value: 'playing', label: t('status.playing'), count: playingCount.value },
+  { value: 'finished', label: t('status.finished'), count: finishedCount.value },
+  { value: 'aborted', label: t('status.aborted'), count: abortedCount.value },
 ])
 
 const filteredRooms = computed(() => {
@@ -47,6 +49,7 @@ const filteredRooms = computed(() => {
       room.id,
       room.gameId,
       getGameName(room.gameId),
+      gameName(room.gameId),
       ...room.players.map(player => player.nickname),
     ].some(value => value.toLowerCase().includes(query))
   })
@@ -78,22 +81,22 @@ watch([search, statusFilter], () => {
       <div class="flex flex-wrap gap-2 items-center">
         <h2 class="text-sm font-medium flex gap-1.5 items-center">
           <span class="i-carbon-list text-base color-active" aria-hidden="true" />
-          Rooms
+          {{ t('rooms.title') }}
         </h2>
         <DisplayNumberBadge :value="filteredRooms.length" />
         <DisplayBadge
-          :text="connected ? 'Live' : 'Connecting'"
+          :text="connected ? t('status.live') : t('status.connecting')"
           :color="connected ? 'success' : 'warning'"
           :icon="connected ? 'i-carbon-radio-button' : 'i-carbon-satellite'"
           rounded="full"
           class="text-mini"
         />
       </div>
-      <FormSearchField v-model="search" placeholder="Search rooms" size="sm" class="w-56" />
+      <FormSearchField v-model="search" :placeholder="t('rooms.search')" size="sm" class="w-56" />
     </div>
     <LayoutTabs v-model="statusFilter" :tabs="statusTabs" variant="segment" class="p-2" />
     <div class="border-t border-base">
-      <FeedbackLoading v-if="!loaded && !rooms.length" panel text="Loading rooms" />
+      <FeedbackLoading v-if="!loaded && !rooms.length" panel :text="t('rooms.loading')" />
       <LayoutPanelGrids
         v-else-if="!filteredRooms.length"
         variant="dots"
@@ -101,14 +104,14 @@ watch([search, statusFilter], () => {
       >
         <FeedbackEmptyState
           icon="i-carbon-search"
-          :title="rooms.length ? 'No matching rooms' : 'No rooms yet'"
+          :title="rooms.length ? t('rooms.noMatching') : t('rooms.noRooms')"
         >
           <template #hint>
             <template v-if="rooms.length">
-              Try a different status or search term.
+              {{ t('rooms.noMatchingHint') }}
             </template>
             <template v-else>
-              Rooms appear here when agents create them over MCP. The lobby updates live.
+              {{ t('rooms.noRoomsHint') }}
             </template>
           </template>
         </FeedbackEmptyState>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { GomokuState } from '#shared/gomoku'
-import { getGame, getGameName } from '#shared/games'
+import { getGame } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
 import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
@@ -13,11 +13,12 @@ import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 const route = useRoute()
 const roomId = computed(() => String(route.params.id ?? ''))
 const { room, pending, error, closed, open, close } = await useRoomDetailFeed(roomId)
+const { t, gameName, sideLabel } = useAppI18n()
 
 onMounted(open)
 onUnmounted(close)
 
-const gameName = computed(() => room.value ? getGameName(room.value.gameId) : '')
+const gameNameLabel = computed(() => room.value ? gameName(room.value.gameId) : '')
 const gameIcon = computed(() => room.value ? getGame(room.value.gameId)?.icon : '')
 const gameSides = computed(() => room.value ? getGame(room.value.gameId)?.sides ?? [] : [])
 const firstSide = computed(() => gameSides.value[0])
@@ -30,17 +31,21 @@ const isLiarDice = computed(() => room.value?.gameId === 'liar-dice')
 const turnLabel = computed(() => {
   const game = room.value?.game
   if (!game)
-    return 'Waiting'
+    return t('status.waiting')
   if (game.status === 'aborted')
-    return 'Aborted'
+    return t('status.aborted')
   if (game.status === 'finished')
-    return game.winner ? 'Finished' : 'Draw'
+    return game.winner ? t('status.finished') : t('room.draw')
   if (isTwentyFour.value)
-    return 'Racing'
+    return t('room.racing')
   if (!game.currentPlayerId)
-    return 'Waiting'
+    return t('status.waiting')
   const index = game.players.findIndex(player => player.sessionId === game.currentPlayerId)
-  return `${gameSides.value[index]?.label ?? `Seat ${index + 1}`} to move`
+  const side = gameSides.value[index]
+  const sideText = side
+    ? sideLabel(side.key, side.label)
+    : t('common.seat', { count: index + 1 })
+  return t('room.toMove', { side: sideText })
 })
 
 const turnColor = computed(() => {
@@ -96,7 +101,7 @@ const winnerNickname = computed(() => {
 })
 
 useHead({
-  title: computed(() => room.value ? `${room.value.name} · Zero Player` : 'Room · Zero Player'),
+  title: computed(() => room.value ? `${room.value.name} · Zero Player` : t('room.title')),
 })
 </script>
 
@@ -110,29 +115,32 @@ useHead({
               as="RouterLink"
               to="/"
               icon="i-carbon-arrow-left"
-              tooltip="Back to lobby"
-              label="Back to lobby"
+              :tooltip="t('room.back')"
+              :label="t('room.back')"
               class="text-base shrink-0"
             />
             <h1 class="text-base font-semibold min-w-0 truncate">
-              {{ room?.name ?? 'Room' }}
+              {{ room?.name ?? t('common.room') }}
             </h1>
           </div>
           <div v-if="room" class="text-mini color-muted font-mono flex gap-1.5 min-w-0 items-center">
             <span class="truncate">{{ room.id }}</span>
             <CopyButton
               :text="room.id"
-              tooltip="Copy room id"
-              label="Copy room id"
+              :tooltip="t('room.copyId')"
+              :label="t('room.copyId')"
               class="shrink-0"
             />
           </div>
         </div>
         <div v-if="room" class="flex shrink-0 flex-col gap-1 items-end">
-          <DisplayBadge :text="gameName" :color="false" :icon="gameIcon" />
+          <DisplayBadge :text="gameNameLabel" :color="false" :icon="gameIcon" />
           <DisplayBadge
             v-if="room.status === 'waiting'"
-            :text="`Ready ${room.readySessionIds?.length ?? 0}/${room.players.length}`"
+            :text="t('room.readyBadge', {
+              ready: room.readySessionIds?.length ?? 0,
+              total: room.players.length,
+            })"
             :color="false"
             rounded="full"
             class="text-mini shrink-0"
@@ -145,11 +153,11 @@ useHead({
       </div>
     </LayoutCard>
 
-    <FeedbackLoading v-if="pending && !room" panel text="Loading room" />
+    <FeedbackLoading v-if="pending && !room" panel :text="t('room.loading')" />
     <FeedbackEmptyState
       v-else-if="error"
       icon="i-carbon-warning"
-      title="Room unavailable"
+      :title="t('room.unavailable')"
     >
       <template #hint>
         {{ error }}
@@ -159,10 +167,10 @@ useHead({
     <FeedbackEmptyState
       v-else-if="closed"
       icon="i-carbon-close-outline"
-      title="Room closed"
+      :title="t('room.closed')"
     >
       <template #hint>
-        {{ room?.name }} has been closed and removed from the lobby.
+        {{ t('room.closedHint', { name: room?.name ?? '' }) }}
       </template>
     </FeedbackEmptyState>
 
@@ -182,7 +190,7 @@ useHead({
           >
             <RoomPlayerCard
               :player="firstPlayer"
-              :label="firstSide?.label ?? 'First'"
+              :label="firstSide ? sideLabel(firstSide.key, firstSide.label) : t('common.first')"
               :color="firstSide?.color ?? false"
               :highlight="room.status === 'finished' && firstPlayer?.sessionId === room.winner"
             />
@@ -191,7 +199,7 @@ useHead({
             </div>
             <RoomPlayerCard
               :player="secondPlayer"
-              :label="secondSide?.label ?? 'Second'"
+              :label="secondSide ? sideLabel(secondSide.key, secondSide.label) : t('common.second')"
               :color="secondSide?.color ?? false"
               :highlight="room.status === 'finished' && secondPlayer?.sessionId === room.winner"
             />
@@ -201,7 +209,7 @@ useHead({
               v-for="(player, index) in players"
               :key="player.sessionId"
               :player="player"
-              :label="`Seat ${index + 1}`"
+              :label="t('common.seat', { count: index + 1 })"
               :color="false"
               :highlight="room.status === 'finished' && player.sessionId === room.winner"
             />
@@ -209,7 +217,7 @@ useHead({
               v-for="index in Math.max(0, room.maxPlayers - players.length)"
               :key="`empty-${index}`"
               :player="null"
-              :label="`Seat ${players.length + index}`"
+              :label="t('common.seat', { count: players.length + index })"
               :color="false"
             />
           </section>
@@ -232,11 +240,11 @@ useHead({
                   <div class="min-w-0">
                     <div class="flex gap-1.5 min-w-0 items-center">
                       <span class="text-sm leading-tight font-medium truncate">
-                        {{ firstPlayer?.nickname ?? firstSide?.label ?? 'First' }}
+                        {{ firstPlayer?.nickname ?? (firstSide ? sideLabel(firstSide.key, firstSide.label) : t('common.first')) }}
                       </span>
                       <DisplayBadge
                         v-if="firstPlayer && room.status === 'finished' && firstPlayer.sessionId === room.winner"
-                        text="Winner"
+                        :text="t('common.winner')"
                         color="success"
                         rounded="full"
                         class="shrink-0"
@@ -248,14 +256,14 @@ useHead({
                       :harness="firstPlayer.harness"
                     />
                     <div v-else class="text-mini color-muted leading-tight font-mono truncate">
-                      Waiting
+                      {{ t('status.waiting') }}
                     </div>
                   </div>
                 </div>
 
                 <div class="flex shrink-0 flex-col gap-0.5 min-w-0 items-center">
                   <h2 class="sr-only">
-                    Board
+                    {{ t('room.board') }}
                   </h2>
                   <div class="text-mini color-muted font-medium flex gap-1.5 items-center">
                     <span
@@ -266,9 +274,9 @@ useHead({
                     {{ turnLabel }}
                   </div>
                   <div class="text-mini color-faint font-mono">
-                    Move <DisplayNumber :value="room.game?.moveCount ?? 0" />
+                    {{ t('room.move') }} <DisplayNumber :value="room.game?.moveCount ?? 0" />
                     <template v-if="lastMoveLabel">
-                      · Last {{ lastMoveLabel }}
+                      · {{ t('room.lastMove', { move: lastMoveLabel }) }}
                     </template>
                   </div>
                 </div>
@@ -277,11 +285,11 @@ useHead({
                   <div class="text-right min-w-0">
                     <div class="flex gap-1.5 min-w-0 items-center justify-end">
                       <span class="text-sm leading-tight font-medium truncate">
-                        {{ secondPlayer?.nickname ?? secondSide?.label ?? 'Second' }}
+                        {{ secondPlayer?.nickname ?? (secondSide ? sideLabel(secondSide.key, secondSide.label) : t('common.second')) }}
                       </span>
                       <DisplayBadge
                         v-if="secondPlayer && room.status === 'finished' && secondPlayer.sessionId === room.winner"
-                        text="Winner"
+                        :text="t('common.winner')"
                         color="success"
                         rounded="full"
                         class="shrink-0"
@@ -293,7 +301,7 @@ useHead({
                       :harness="secondPlayer.harness"
                     />
                     <div v-else class="text-mini color-muted leading-tight font-mono truncate">
-                      Waiting
+                      {{ t('status.waiting') }}
                     </div>
                   </div>
                   <DisplayAvatar

@@ -17,33 +17,42 @@ const mcpConfigExample = computed(() => `{
 const mcpConfigHtml = computed(() => highlight(mcpConfigExample.value, { lang: 'json' }))
 
 const open = ref(false)
+const { t } = useAppI18n()
 </script>
 
 <template>
   <OverlayModal
     v-model="open"
-    title="Integration guide"
-    description="Connect agents to Zero Player."
+    :title="t('guide.title')"
+    :description="t('guide.description')"
   >
     <template #trigger>
       <ActionButton icon="i-carbon-plug" size="sm">
-        Integration Guide
+        {{ t('guide.button') }}
       </ActionButton>
     </template>
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1.5">
-        <span class="text-micro color-faint tracking-wide uppercase">Endpoint</span>
+        <span class="text-micro color-faint tracking-wide uppercase">{{ t('guide.endpoint') }}</span>
         <div class="flex gap-1.5 items-center">
           <code class="text-xs font-mono px-2 py-1 border border-base rounded-lg bg-code flex-1 min-w-0 truncate">
             {{ mcpEndpoint }}
           </code>
-          <CopyButton :text="mcpEndpoint" tooltip="Copy endpoint" label="Copy endpoint" />
+          <CopyButton
+            :text="mcpEndpoint"
+            :tooltip="t('guide.copyEndpoint')"
+            :label="t('guide.copyEndpoint')"
+          />
         </div>
       </div>
       <div class="flex flex-col gap-1.5">
         <div class="flex gap-2 items-center justify-between">
-          <span class="text-micro color-faint tracking-wide uppercase">Client config</span>
-          <CopyButton :text="mcpConfigExample" tooltip="Copy client config" label="Copy client config" />
+          <span class="text-micro color-faint tracking-wide uppercase">{{ t('guide.clientConfig') }}</span>
+          <CopyButton
+            :text="mcpConfigExample"
+            :tooltip="t('guide.copyClientConfig')"
+            :label="t('guide.copyClientConfig')"
+          />
         </div>
         <pre
           class="sh-code text-xs leading-relaxed font-mono p-3 border border-base rounded-lg overflow-x-auto"
@@ -51,10 +60,18 @@ const open = ref(false)
       </div>
       <div class="flex flex-col gap-1.5">
         <div class="flex gap-2 items-center justify-between">
-          <span class="text-micro color-faint tracking-wide uppercase">Agent skill</span>
+          <span class="text-micro color-faint tracking-wide uppercase">{{ t('guide.agentSkill') }}</span>
           <div class="flex gap-1.5 items-center">
-            <CopyButton :text="skillMarkdown" tooltip="Copy skill" label="Copy skill" />
-            <DownloadButton url="/zero-player.zip" tooltip="Download skill zip" label="Download skill zip" />
+            <CopyButton
+              :text="skillMarkdown"
+              :tooltip="t('guide.copySkill')"
+              :label="t('guide.copySkill')"
+            />
+            <DownloadButton
+              url="/zero-player.zip"
+              :tooltip="t('guide.downloadSkill')"
+              :label="t('guide.downloadSkill')"
+            />
           </div>
         </div>
         <pre

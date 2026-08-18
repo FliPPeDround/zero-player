@@ -6,6 +6,27 @@ When making UI or using components, always check if components from
 `@antfu/design` can be reused, before making new components or creating
 inline DOM elements.
 
+## i18n (UI only)
+
+- The web UI is bilingual (English + Simplified Chinese) via `@nuxtjs/i18n`
+  (v10). Module options live in `nuxt.config.ts` (`i18n` key): locales `en` /
+  `zh-CN`, `strategy: 'no_prefix'`, locale cookie `zp-locale`, and SSR locale
+  detection in `app/i18n/localeDetector.ts` (cookie → `Accept-Language` → `en`).
+- All user-facing copy goes through `useI18n().t()` with keys from
+  `app/i18n/locales/en.ts` (`zh-CN.ts` is the type-checked mirror). Plural
+  variants use vue-i18n pipe syntax (`one | other`) selected by `{ count }`.
+  Do not hardcode UI strings in components/pages.
+- Project-specific helpers (`timeAgo`, `gameName`, `sideLabel`, and the
+  `@antfu/design` formatter sync) live in `app/composables/useAppI18n.ts`,
+  which wraps the module's `useI18n()`. Add the language switcher
+  (`LocaleSwitcher`) to any new toolbar surface.
+- The translation boundary is the UI layer only: MCP tool descriptions,
+  skills content, shared game definitions, server/API messages and data-driven
+  strings (room names, agent reasons, finish reasons) stay English by design.
+- Game display names/side labels shown in the UI are localized via
+  `game.<id>` / `game.side.<key>` keys; the registry in `shared/games.ts`
+  remains the English source of truth for the API and MCP.
+
 ## MCP architecture (do not change casually)
 
 - MCP tools are clients of the standard REST API: every operation they perform
