@@ -3,6 +3,8 @@ shellEmulator: true
 trustPolicy: no-downgrade
 packages: []
 autoInstallPeers: false
+catalog:
+  archiver: ^7.0.1
 catalogs:
   auth:
     '@better-auth/cli': ^1.4.21
@@ -26,6 +28,8 @@ catalogs:
     '@leafer-in/animate': ^2.2.9
     '@leafer-in/color': ^2.2.9
     leafer-ui: ^2.2.9
+  cli:
+    bumpp: ^12.2.1
   db:
     '@libsql/client': ^0.17.4
     drizzle-kit: ^0.31.10
@@ -41,9 +45,11 @@ catalogs:
     eslint: ^10.8.0
     eslint-plugin-format: ^2.0.1
     typescript: ^5.9.3
+    vitest: ^4.1.10
     vue-tsc: ^3.3.9
   frontend:
     '@vueuse/core': ^14.4.0
+    sugar-high: ^2.0.1
     vue: ^3.5.41
   icons:
     '@iconify-json/carbon': ^1.2.25

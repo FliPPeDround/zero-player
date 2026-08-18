@@ -56,7 +56,7 @@ export const GAMES = [
 
 export type GameId = typeof GAMES[number]['id']
 
-export const GAME_IDS = GAMES.map(game => game.id) as [GameId, ...GameId[]]
+export const GAME_IDS = GAMES.map(game => game.id)
 
 export function getGame(gameId: string): GameDefinition | undefined {
   return GAMES.find(game => game.id === gameId)

@@ -8,6 +8,7 @@ dist
 .env
 .idea/
 public/assets/fonts
+public/zero-player.zip
 
 # Agent skills from npm packages (managed by skills-npm)
 **/skills/npm-*

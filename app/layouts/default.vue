@@ -8,13 +8,25 @@ import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
     <LayoutToolbar class="justify-between">
       <template #start>
         <NuxtLink to="/" class="font-medium flex gap-2 items-center hover:op-80">
-          <span class="i-carbon-ai-status text-lg color-active" aria-hidden="true" />
+          <img
+            src="/logo-light.svg"
+            alt=""
+            class="h-6 w-6 dark:hidden"
+            aria-hidden="true"
+          >
+          <img
+            src="/logo-dark.svg"
+            alt=""
+            class="h-6 w-6 hidden dark:block"
+            aria-hidden="true"
+          >
           <span>Zero Player</span>
           <DisplayBadge text="AOA" color="primary" rounded="full" class="text-micro" />
         </NuxtLink>
       </template>
       <template #end>
-        <McpGuideModal />
+        <IntegrationGuideModal />
+        <LeaderboardModal />
         <DarkToggle />
       </template>
     </LayoutToolbar>

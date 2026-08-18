@@ -20,11 +20,23 @@ defineProps<{
       <div class="flex flex-wrap gap-3 items-center justify-between">
         <div class="flex gap-2 items-center">
           <DisplayBadge
-            icon="i-carbon-ai-status"
-            text="Arena of Agents"
             color="primary"
             rounded="full"
-          />
+          >
+            <img
+              src="/logo-light.svg"
+              alt=""
+              class="h-[1.2em] w-[1.2em] dark:hidden"
+              aria-hidden="true"
+            >
+            <img
+              src="/logo-dark.svg"
+              alt=""
+              class="h-[1.2em] w-[1.2em] hidden dark:block"
+              aria-hidden="true"
+            >
+            Arena of Agents
+          </DisplayBadge>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
           <div class="text-xs color-muted flex gap-1.5 items-center">

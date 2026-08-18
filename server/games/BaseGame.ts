@@ -12,7 +12,7 @@ import { defineMcpTool } from '@nuxtjs/mcp-toolkit/server'
 import { z } from 'zod'
 import { describeRoomOutcome, getCurrentRoomId } from '../mcp/utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../mcp/utils/identity'
-import { getWatchCommand, getWindowsWatchCommand } from '../mcp/utils/room-url'
+import { getWatchCommand } from '../mcp/utils/room-url'
 import { toMcpGameResult } from '../mcp/utils/room-view'
 
 export const GAME_SCHEMA_VERSION = 1
@@ -113,7 +113,7 @@ export abstract class BaseGame<
       name: definition.toolName,
       group: 'games',
       description: turnBased
-        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state and a watchCommand you can run in your shell to stream live updates until it is your turn. It submits your move and returns immediately with the updated state and ASCII board; when the opponent is thinking, the response includes a watchCommand you can run in your shell to stream live updates until it is your turn again.`
+        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state and a watchCommand to run in your shell — keep it streaming in the background until it is your turn. It submits your move and returns immediately with the updated state and ASCII board; when the opponent is thinking, keep the returned watchCommand streaming to be notified when it is your turn again.`
         : `${definition.description} Call this any time while the game is running. It submits your answer and returns immediately with the updated room state and correct/incorrect feedback — it never waits for the opponent.`,
       inputSchema: {
         ...definition.inputSchema,
@@ -165,15 +165,13 @@ export abstract class BaseGame<
 
         if (turnBased && !isMyTurn(room)) {
           const watchCommand = getWatchCommand(room.id, token)
-          const watchCommandWindows = getWindowsWatchCommand(room.id, token)
           const message = room.status === 'waiting'
-            ? `The game has not started. Once the room is full, call start-game to mark yourself ready — the game starts only after every player has called it. Until then, run the returned watchCommand (Windows: watchCommandWindows) to be notified when the game starts / it is your turn, then call ${definition.toolName}.`
-            : `It is not your turn yet. Run the returned watchCommand (Windows: watchCommandWindows) to be notified when it is your turn, then call ${definition.toolName}.`
+            ? `The game has not started. Once the room is full, call start-game to mark yourself ready — the game starts only after every player has called it. Keep the returned watchCommand streaming in the background; it pushes "Call start-game now" / turn hints. Then call ${definition.toolName}.`
+            : `It is not your turn yet. Keep the returned watchCommand streaming in the background — it pushes "call ${definition.toolName} now" when it is your turn.`
           return echo({
             message,
             ...present(room),
             watchCommand,
-            watchCommandWindows,
           })
         }
 
@@ -225,12 +223,10 @@ export abstract class BaseGame<
         }
 
         const watchCommand = getWatchCommand(roomId, token)
-        const watchCommandWindows = getWindowsWatchCommand(roomId, token)
         return echo({
-          message: `${definition.describeAction(args as Record<string, unknown>)}. Move submitted — waiting for the opponent's reply. Run the returned watchCommand (Windows: watchCommandWindows) to stream live updates, or poll with get-room.`,
+          message: `${definition.describeAction(args as Record<string, unknown>)}. Move submitted — waiting for the opponent's reply. Keep the returned watchCommand streaming in the background to see their move and your next turn, or poll with get-room.`,
           ...present(updatedRoom),
           watchCommand,
-          watchCommandWindows,
         })
       },
     })

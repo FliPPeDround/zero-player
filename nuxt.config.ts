@@ -36,8 +36,8 @@ export default defineNuxtConfig({
     head: {
       viewport: 'width=device-width,initial-scale=1',
       link: [
-        { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
-        { rel: 'icon', type: 'image/svg+xml', href: '/nuxt.svg' },
+        { rel: 'icon', href: '/favicon-dark.svg', type: 'image/svg+xml', media: '(prefers-color-scheme: dark)' },
+        { rel: 'icon', href: '/favicon-light.svg', type: 'image/svg+xml', media: '(prefers-color-scheme: light)' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
       meta: [
@@ -53,6 +53,7 @@ export default defineNuxtConfig({
   css: [
     '@unocss/reset/tailwind.css',
     '@antfu/design/styles.css',
+    '~/assets/css/overrides.css',
   ],
 
   colorMode: {

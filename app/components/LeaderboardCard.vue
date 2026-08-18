@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { RoomSummary } from '#shared/rooms'
-import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
+import ActionToggleGroup from '@antfu/design/components/Action/ActionToggleGroup.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
@@ -8,8 +7,6 @@ import DisplayProgressBar from '@antfu/design/components/Display/DisplayProgress
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import FeedbackLoading from '@antfu/design/components/Feedback/FeedbackLoading.vue'
 import FormSegmentedControl from '@antfu/design/components/Form/FormSegmentedControl.vue'
-import FormSelect from '@antfu/design/components/Form/FormSelect.vue'
-import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
 
 interface LeaderboardEntry {
@@ -33,10 +30,6 @@ interface LeaderboardResponse {
 
 type Dimension = 'model' | 'harness' | 'combo'
 
-const props = defineProps<{
-  rooms?: RoomSummary[]
-}>()
-
 const dimension = ref<Dimension>('model')
 const gameFilter = ref('all')
 
@@ -46,10 +39,10 @@ const dimensionOptions = [
   { value: 'combo', label: 'Model + Harness' },
 ]
 
-const { data, pending, error, refresh } = await useFetch<LeaderboardResponse>(
+const { data, pending, error } = await useFetch<LeaderboardResponse>(
   '/api/leaderboard',
   {
-    // The home page is prerendered at build time, before the runtime database
+    // Pages are prerendered at build time, before the runtime database
     // is available. Fetching on the client keeps the leaderboard live and
     // avoids baking a build-time 500 into the static page.
     server: false,
@@ -70,47 +63,16 @@ const entries = computed(() => {
   return data.value?.[dimension.value] ?? []
 })
 
-const PAGE_SIZE = 5
-const shown = ref(PAGE_SIZE)
-
-watch([dimension, gameFilter], () => {
-  shown.value = PAGE_SIZE
-})
-
-const visibleEntries = computed(() => entries.value.slice(0, shown.value))
-const hiddenCount = computed(() => Math.max(0, entries.value.length - shown.value))
-const expanded = computed(() => shown.value >= entries.value.length)
-
-function showMore(): void {
-  shown.value = Math.min(entries.value.length, shown.value + PAGE_SIZE)
-}
-
-function collapse(): void {
-  shown.value = PAGE_SIZE
-}
-
-const seenFinishedIds = ref(new Set<string>())
-
-function syncSeenFinished(rooms: RoomSummary[] | undefined): boolean {
-  const ids = new Set((rooms ?? []).filter(room => room.status === 'finished').map(room => room.id))
-  const hasNew = [...ids].some(id => !seenFinishedIds.value.has(id))
-  seenFinishedIds.value = ids
-  return hasNew
-}
-
-if (props.rooms)
-  seenFinishedIds.value = new Set(props.rooms.filter(room => room.status === 'finished').map(room => room.id))
-
-watch(() => props.rooms, (rooms) => {
-  if (syncSeenFinished(rooms))
-    refresh().catch(() => {})
-}, { deep: true })
+// Show the top entries only; the full table stays reachable through the
+// dimension/game filters, keeping the modal compact.
+const TOP_ENTRIES = 8
+const visibleEntries = computed(() => entries.value.slice(0, TOP_ENTRIES))
 </script>
 
 <template>
-  <LayoutCard :padding="false" class="min-w-0 overflow-hidden">
-    <div class="px-4 py-3 border-b border-base flex flex-wrap gap-3 items-center justify-between">
-      <div class="flex flex-wrap gap-2 items-center">
+  <div class="min-w-0 overflow-hidden">
+    <div class="px-4 py-3 border-b border-base flex flex-col gap-2.5">
+      <div class="flex flex-wrap gap-2 items-center justify-between">
         <h2 class="text-sm font-medium flex gap-1.5 items-center">
           <span class="i-carbon-trophy text-base color-active" aria-hidden="true" />
           Leaderboard
@@ -121,14 +83,15 @@ watch(() => props.rooms, (rooms) => {
           suffix=" games"
         />
       </div>
-      <div class="flex flex-wrap gap-2 items-center">
-        <FormSelect
-          v-if="showGameFilter"
-          v-model="gameFilter"
-          :options="gameOptions"
-          placeholder="All games"
-        />
-        <FormSegmentedControl v-model="dimension" :options="dimensionOptions" />
+      <div class="flex flex-wrap gap-x-4 gap-y-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center">
+          <span class="text-micro color-faint tracking-wide uppercase">Rank by</span>
+          <FormSegmentedControl v-model="dimension" :options="dimensionOptions" />
+        </div>
+        <div v-if="showGameFilter" class="flex flex-wrap gap-2 items-center">
+          <span class="text-micro color-faint tracking-wide uppercase">Game</span>
+          <ActionToggleGroup v-model="gameFilter" :options="gameOptions" />
+        </div>
       </div>
     </div>
 
@@ -222,32 +185,6 @@ watch(() => props.rooms, (rooms) => {
             </div>
           </div>
         </div>
-        <div
-          v-if="hiddenCount > 0"
-          class="h-8 pointer-events-none inset-x-0 bottom-0 absolute bg-gradient-more"
-        />
-      </div>
-
-      <div
-        v-if="hiddenCount > 0 || (expanded && entries.length > PAGE_SIZE)"
-        class="px-4 py-2.5 flex items-center justify-center"
-      >
-        <ActionButton
-          size="sm"
-          variant="action"
-          @click="expanded ? collapse() : showMore()"
-        >
-          <span>{{ expanded ? 'Show less' : 'Show more' }}</span>
-          <DisplayNumberBadge
-            v-if="hiddenCount > 0"
-            :value="hiddenCount"
-            class="text-mini"
-          />
-          <span
-            :class="expanded ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'"
-            aria-hidden="true"
-          />
-        </ActionButton>
       </div>
     </div>
     <div class="px-4 py-2 border-t border-base">
@@ -256,5 +193,5 @@ watch(() => props.rooms, (rooms) => {
         Win rate counts finished matches only
       </span>
     </div>
-  </LayoutCard>
+  </div>
 </template>

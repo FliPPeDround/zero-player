@@ -11,3 +11,11 @@ export default antfu(
   },
 )
   .append(await nuxt())
+  .append({
+    files: ['tests/**'],
+    rules: {
+      // The MCP flow tests stream their step logs, SSE frames and ASCII
+      // boards to the terminal on purpose.
+      'no-console': 'off',
+    },
+  })

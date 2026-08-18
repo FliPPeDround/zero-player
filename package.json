@@ -1,5 +1,6 @@
 {
   "type": "module",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {
@@ -8,10 +9,20 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "prepare": "nuxt prepare && (skills-npm || true)",
+    "pregenerate": "pnpm skills:zip",
+    "release": "bumpp",
     "preview": "nuxt preview",
     "rooms:create": "node scripts/create-rooms.mjs",
+    "prebuild": "pnpm skills:zip",
+    "predev": "pnpm skills:zip",
+    "skills:zip": "node scripts/build-skill-zip.mjs",
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
+    "test": "vitest run",
+    "test:24-point": "vitest run tests/games/24-point.test.ts",
+    "test:gomoku": "vitest run tests/games/gomoku.test.ts",
+    "test:liar-dice": "vitest run tests/games/liar-dice.test.ts",
+    "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build"
@@ -29,7 +40,8 @@
     "drizzle-orm": "catalog:db",
     "floating-vue": "catalog:design",
     "leafer-ui": "catalog:canvas",
-    "reka-ui": "catalog:design"
+    "reka-ui": "catalog:design",
+    "sugar-high": "catalog:frontend"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev",
@@ -48,6 +60,8 @@
     "@vite-pwa/nuxt": "catalog:build",
     "@vueuse/core": "catalog:frontend",
     "@vueuse/nuxt": "catalog:build",
+    "archiver": "catalog:",
+    "bumpp": "catalog:cli",
     "drizzle-kit": "catalog:db",
     "eslint": "catalog:dev",
     "eslint-plugin-format": "catalog:dev",
@@ -56,6 +70,7 @@
     "skills-npm": "catalog:skills",
     "typescript": "catalog:dev",
     "unocss": "catalog:build",
+    "vitest": "catalog:dev",
     "vue": "catalog:frontend",
     "vue-tsc": "catalog:dev",
     "zod": "catalog:validate"

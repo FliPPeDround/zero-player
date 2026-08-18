@@ -39,7 +39,6 @@ const stats = computed(() => [
 <template>
   <div class="flex flex-col gap-6">
     <LobbyHero :visitors="visitors" :stats="stats" />
-    <LeaderboardCard :rooms="rooms" />
     <RoomListCard :rooms="rooms" :loaded="loaded" :connected="connected" />
   </div>
 </template>

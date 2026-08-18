@@ -20,25 +20,28 @@ function isTerminal(room: Room): boolean {
 }
 
 /**
- * Public SSE stream of one room's real-time state, consumed by the watcher
- * scripts (`watch-room.sh` / `watch-room.ps1`), which poll this endpoint
- * with short-lived connections and read the initial snapshot of each poll.
+ * Public SSE stream of one room's real-time state, consumed directly by the
+ * `watchCommand` returned from the MCP tools (a plain `curl -N` against this
+ * endpoint). It is a whole-match stream: it stays open from room creation
+ * through the end of the game and pushes every state change as it happens,
+ * instead of exiting at intermediate steps.
  *
  * While the room is waiting this stream stays compact: an initial snapshot
  * with the player count, `ready` (room full) and `youReady` (the watching
  * player already called `start-game`) flags, then `joined` / `left` / `ready`
- * events for each player change. `start-game` only marks the caller ready, so
- * the stream keeps polling until the game actually starts (both players
- * ready), at which point it emits a `gameStarted` payload with the compact
- * game state and closes.
+ * events for each player change, including a "Call start-game now" message
+ * when the room is full and the watching player is not ready yet. When the
+ * game actually starts (both players ready) it emits a `gameStarted` payload
+ * with the compact game state and keeps streaming.
  *
  * Once a game is running, token-authenticated watchers get the same compact
  * payload as the `make-<game>-move` tools (yourSide, currentPlayer,
- * moveNumber, lastMove / challenge, board). For Gomoku, when `currentPlayer`
- * becomes `you` the stream sends "call make-gomoku-move now" and closes;
- * Liar's Dice wakes its player the same way. Other games stream compact state
- * until the game ends. Spectators without a token keep the sanitized full room
- * view (no opponent move reasons, no raw coordinate board, no hidden hands).
+ * moveNumber, lastMove / challenge, board) and an action hint whenever it is
+ * their turn ("call make-<game>-move now"). Spectators without a token keep
+ * the sanitized full room view (no opponent move reasons, no raw coordinate
+ * board, no hidden hands). The stream closes only when the game ends
+ * (finished/aborted), the room is closed, the watcher disconnects, or an
+ * error occurs.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -199,16 +202,16 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  /** The waiting watcher's terminal payload: the game just started. */
+  /** Payload sent when the game just started; the stream stays open. */
   const presentGameStarted = (room: Room, type: 'snapshot' | 'update'): void => {
     if (userId && tokenValue) {
       void sendJson({
         ...presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)),
         gameStarted: true,
-      }).then(stop)
+      })
       return
     }
-    void sendJson({ ...presentFull(type, room), gameStarted: true }).then(stop)
+    void sendJson({ ...presentFull(type, room), gameStarted: true })
   }
 
   unsubscribe = onRoomDetail(id, (message) => {
@@ -245,13 +248,9 @@ export default defineEventHandler(async (event) => {
     }
 
     if (userId && tokenValue) {
-      const myTurn = room.status === 'playing' && room.game?.currentPlayerId === userId
-      if (isTerminal(room) || myTurn) {
-        const pushed = sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
+      const pushed = sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
+      if (isTerminal(room))
         void pushed.then(stop)
-        return
-      }
-      void sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
       return
     }
 
@@ -297,13 +296,11 @@ export default defineEventHandler(async (event) => {
             return
           }
           if (userId && tokenValue) {
-            const myTurn = room.status === 'playing' && room.game?.currentPlayerId === userId
-            if (isTerminal(room) || myTurn) {
-              await sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
+            await sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
+            if (isTerminal(room)) {
               stop()
               return
             }
-            await sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
             schedulePoll(Date.now() - startedAt)
             return
           }
@@ -347,15 +344,11 @@ export default defineEventHandler(async (event) => {
   }
   else {
     if (userId && tokenValue) {
-      const myTurn = initial.status === 'playing' && initial.game?.currentPlayerId === userId
-      if (isTerminal(initial) || myTurn) {
-        void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
+      void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
+      if (isTerminal(initial))
         stop()
-      }
-      else {
-        void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
+      else
         schedulePoll(0)
-      }
     }
     else {
       void sendJson(presentFull('snapshot', initial))
