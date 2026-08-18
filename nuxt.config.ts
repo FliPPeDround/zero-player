@@ -59,6 +59,9 @@ export default defineNuxtConfig({
   colorMode: {
     classSuffix: '',
   },
+  devServer: {
+    port: 3000,
+  },
 
   future: {
     compatibilityVersion: 4,
