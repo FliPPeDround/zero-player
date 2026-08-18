@@ -80,6 +80,12 @@
       "skillPath": "skills/pnpm/SKILL.md",
       "computedHash": "2ec08c851c6f901d4ed72c21b826416ed074a487db65662b36249418afd728bf"
     },
+    "reclaim-code-entropy": {
+      "source": "Yevanchen/reclaim-code-entropy",
+      "sourceType": "github",
+      "skillPath": "skills/reclaim-code-entropy/SKILL.md",
+      "computedHash": "40d7c226549bb67c45158edf1988210da2c0436152046f99a43bde108ff91dc3"
+    },
     "two-factor-authentication-best-practices": {
       "source": "better-auth/skills",
       "sourceType": "github",
