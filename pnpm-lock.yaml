@@ -31,6 +31,9 @@ catalogs:
     '@vueuse/nuxt':
       specifier: ^14.4.0
       version: 14.4.0
+    archiver:
+      specifier: ^7.0.1
+      version: 7.0.1
     unocss:
       specifier: ^66.7.5
       version: 66.7.5
@@ -58,10 +61,6 @@ catalogs:
     drizzle-orm:
       specifier: ^0.45.2
       version: 0.45.2
-  default:
-    archiver:
-      specifier: ^7.0.1
-      version: 7.0.1
   design:
     '@antfu/design':
       specifier: ^0.3.3
@@ -98,6 +97,9 @@ catalogs:
       specifier: ^3.3.9
       version: 3.3.9
   frontend:
+    '@nuxtjs/i18n':
+      specifier: ^10.6.0
+      version: 10.6.0
     '@vueuse/core':
       specifier: ^14.4.0
       version: 14.4.0
@@ -230,7 +232,7 @@ importers:
         specifier: catalog:build
         version: 4.0.1(magic-string@1.1.0)(magicast@0.5.4)(oxc-parser@0.141.0)(rolldown@1.2.3)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.0(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.39.0)(tsx@4.23.12)(yaml@2.9.0)))
       '@nuxtjs/i18n':
-        specifier: ^10.6.0
+        specifier: catalog:frontend
         version: 10.6.0(db0@0.3.4(@libsql/client@0.17.4)(better-sqlite3@12.11.1)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260702.1)(@libsql/client@0.17.4)(@prisma/client@5.22.0)(@types/pg@8.21.0)(better-sqlite3@12.11.1)(kysely@0.29.5)(pg@8.23.0)))(esbuild@0.28.1)(eslint@10.8.0(jiti@2.7.0))(ioredis@5.11.1)(magicast@0.5.4)(rolldown@1.2.3)(rollup@4.62.4)(typescript@5.9.3)(vite@8.2.0(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.39.0)(tsx@4.23.12)(yaml@2.9.0))(vue@3.5.41(typescript@5.9.3))
       '@nuxtjs/mcp-toolkit':
         specifier: catalog:mcp
@@ -254,7 +256,7 @@ importers:
         specifier: catalog:build
         version: 14.4.0(magic-string@1.1.0)(magicast@0.5.4)(nuxt@4.5.2(af4698a949cdca74aab43086afc33f2f))(oxc-parser@0.141.0)(rolldown@1.2.3)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.0(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.39.0)(tsx@4.23.12)(yaml@2.9.0)))(vue@3.5.41(typescript@5.9.3))
       archiver:
-        specifier: 'catalog:'
+        specifier: catalog:build
         version: 7.0.1
       bumpp:
         specifier: catalog:cli

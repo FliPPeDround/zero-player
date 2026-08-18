@@ -42,7 +42,7 @@ const KV_TTL_MAX_SECONDS = 60 * 60 * 24 * 7
 
 let eventCounter = 0
 
-export type RoomUpdateListMessage
+type RoomUpdateListMessage
   = { type: 'created' | 'updated', room: RoomSummary }
     | { type: 'deleted', room: RoomSummary }
 

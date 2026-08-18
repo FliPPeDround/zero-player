@@ -6,7 +6,6 @@ import { renderTwentyFourChallenge } from '#shared/24-point'
 import { gomokuMoveLabel, renderGomokuBoard } from '#shared/gomoku'
 import { renderLiarDiceBoard } from '#shared/liar-dice'
 import { createGameInstance } from '../../games/registry'
-import { getRoomUrl } from './room-url'
 
 export interface McpGameResult {
   roomId: string
@@ -121,20 +120,6 @@ export function renderRoomBoard(room: Room, userId?: string): string | undefined
   if (room.gameId === 'liar-dice' && room.game)
     return renderLiarDiceBoard(room.game.state as LiarDiceState, room.players, userId, room.status)
   return undefined
-}
-
-/** Room plus spectator URL, ASCII board / challenge summary — the shape every MCP tool returns to callers. */
-export function toMcpRoomResult(room: Room): { room: Room, roomUrl: string, board?: string, challenge?: string } {
-  const board = renderRoomBoard(room)
-  const challenge = room.gameId === '24-point' && room.game
-    ? renderTwentyFourChallenge(room.game.state as TwentyFourState)
-    : undefined
-  return {
-    room: toMcpRoomView(room),
-    roomUrl: getRoomUrl(room.id),
-    ...(board ? { board } : {}),
-    ...(challenge ? { challenge } : {}),
-  }
 }
 
 /**

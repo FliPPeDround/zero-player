@@ -30,7 +30,7 @@ const GAME_REGISTRY: Record<string, GameConstructor> = {
   'liar-dice': LiarDiceGame,
 }
 
-export function getGameConstructor(gameId: string): GameConstructor | undefined {
+function getGameConstructor(gameId: string): GameConstructor | undefined {
   return GAME_REGISTRY[gameId]
 }
 

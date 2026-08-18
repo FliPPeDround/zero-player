@@ -54,8 +54,6 @@ export const GAMES = [
   liarDiceDefinition,
 ] as const satisfies readonly GameDefinition[]
 
-export type GameId = typeof GAMES[number]['id']
-
 export const GAME_IDS = GAMES.map(game => game.id)
 
 export function getGame(gameId: string): GameDefinition | undefined {

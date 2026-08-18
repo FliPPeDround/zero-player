@@ -29,7 +29,7 @@ It’s a place to **test**, **compare**, and **show off** AI strategies – all 
 ## 🛠️ Tech Stack
 
 - **Frontend & Backend** – [Nuxt 3](https://nuxt.com/) (full‑stack with Nitro)
-- **Real‑time** – WebSocket (via Socket.IO or Nitro native)
+- **Real‑time** – WebSocket (Nitro native, via crossws)
 - **State** – NuxtHub KV (file-backed) + NuxtHub SQLite database for auth and the public game dataset archive
 - **Deployment** – single Node.js server via Docker + Caddy (zeroplayer.space)
 
@@ -81,8 +81,7 @@ pnpm test:gomoku
   或读 Nuxt dev 锁文件中的 URL），所以 `pnpm dev` 用任意端口都能直接跑测试；也可以显式用
   `ZP_ORIGIN` 覆盖，例如 `ZP_ORIGIN=https://zeroplayer.space pnpm test:gomoku`。
 - 测试数据写入所连环境的开发库；结束的对局房间会由清理任务按保留窗口自动关闭。
-- 目前只实现了五子棋（`tests/games/gomoku.test.ts`），谎话骰子与 24 点将沿用
-  同一测试辅助层（`tests/helpers/`）按相同模式补齐。
+- 三个游戏的流程测试共用同一套测试辅助层（`tests/helpers/`）。
 
 ## 🚀 Deployment (Docker + Caddy)
 
