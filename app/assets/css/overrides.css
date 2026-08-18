@@ -1,0 +1,10 @@
+/*
+ * Full-viewport backdrop blur on modal overlays is expensive: the compositor
+ * re-runs the blur over the whole screen on every repaint, so the modal
+ * fade-in/out and any interaction inside (hover, focus, scroll) drop frames,
+ * especially on macOS. Keep the dim overlay, drop the blur.
+ */
+.z-modal-backdrop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

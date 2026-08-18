@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t d">
+<title id="t">ZeroPlayer favicon — light</title>
+<desc id="d">Zero ring with a trace arc, black ring with green arc</desc>
+<g transform="translate(2,2) scale(0.30)"><circle cx="100" cy="100" r="72" fill="none" stroke="#1C1E21" stroke-width="5.5"/>
+<path d="M53.6,87.6 A48,48 0 0 1 87.6,53.6" fill="none" stroke="#49833E" stroke-width="3.5" stroke-linecap="round"/></g>
+</svg>
