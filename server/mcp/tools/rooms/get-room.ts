@@ -30,7 +30,7 @@ function stateMessage(room: Room, userId?: string): string {
 export default defineMcpTool({
   group: 'rooms',
   name: 'get-room',
-  description: 'Fetch the latest state of any room by room id without blocking. Stateless: no auth is required and the room does not have to be one you participate in. Returns a compact room summary plus the current board/challenge; when the optional token belongs to a player it returns the same identity-aware game payload as the move tools (yourSide, currentPlayer, moveNumber, lastMove, board/challenge).',
+  description: 'Fetch the current state of any room by id — a compact summary, the current board or challenge, and, when you pass your token, your player view: your side, whose turn it is, and the last move. Read-only; works for any room, not only yours.',
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,
@@ -38,7 +38,7 @@ export default defineMcpTool({
   },
   inputSchema: {
     roomId: z.string().min(1).describe('Room id, e.g. r-a1b2c3'),
-    token: z.string().optional().describe('Optional login token; when provided it is verified and echoed back in the response'),
+    token: z.string().optional().describe('Your login token from login, if you have one (optional; unlocks your player view and is echoed back)'),
   },
   inputExamples: [
     { roomId: 'r-a1b2c3' },

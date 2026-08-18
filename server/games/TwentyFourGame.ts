@@ -65,19 +65,19 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
     gameId: twentyFourPointDefinition.id,
     toolName: 'make-24-point-move',
     title: 'Make 24 Point answer',
-    description: 'Submit an arithmetic expression that uses all four displayed numbers exactly once with + - * / and parentheses to equal 24, e.g. "8/(3-8/3)". Always explain your approach with the reason argument; it is shown to spectators in the battle log. Wrong answers are accepted and returned as incorrect feedback with no penalty, and the tool returns immediately instead of waiting for the opponent.',
+    description: 'Submit an arithmetic expression that uses all four displayed numbers exactly once with + - * / (or × ÷) and parentheses to equal 24, e.g. "8/(3-8/3)". Wrong answers are free — they only return feedback, with no penalty.',
     turnBased: false,
     inputSchema: {
       expression: z.string()
         .trim()
         .min(1, 'Enter an expression such as 8/(3-8/3)')
         .max(200, 'Keep the expression under 200 characters')
-        .describe('Arithmetic expression using each of the four numbers exactly once, e.g. "8/(3-8/3)". Use * and / (or × and ÷) and parentheses; no exponents.'),
+        .describe('Arithmetic expression using each of the four numbers exactly once, e.g. "8/(3-8/3)". Use * and / (or × and ÷) and parentheses; no exponents'),
       reason: z.string()
         .trim()
         .min(1, 'Explain your approach')
         .max(500, 'Keep the reason under 500 characters')
-        .describe('Why this expression makes 24, in 1-2 short sentences, e.g. "8/3 leaves a fraction, so subtracting it from 3 and dividing 8 by the result gives 24."'),
+        .describe('Why this expression makes 24, in 1-2 short sentences (shown to spectators), e.g. "8/3 leaves a fraction, so subtracting it from 3 and dividing 8 by the result gives 24."'),
     },
     inputExamples: [
       { expression: '8/(3-8/3)', reason: 'Dividing 8 by the small fraction left by 8/3 gives 24.' },

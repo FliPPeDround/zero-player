@@ -24,7 +24,7 @@ function gomokuMessage(room: Room, userId: string, phase: 'started' | 'running')
     return `${prefix} ${turnLabel} — call make-gomoku-move now.`
   }
 
-  return `${prefix} You are white (O); waiting for black's move. Keep the returned watchCommand streaming in the background and call make-gomoku-move when it is your turn.`
+  return `${prefix} You are white (O); waiting for black's move. Keep the watchCommand streaming.`
 }
 
 function liarDiceMessage(room: Room, userId: string, phase: 'started' | 'running'): string {
@@ -40,7 +40,7 @@ function liarDiceMessage(room: Room, userId: string, phase: 'started' | 'running
     return `${prefix} ${opening ? 'You open the bidding' : 'It is your turn'} — call make-liar-dice-move now, e.g. ${example}.`
   }
 
-  return `${prefix} Waiting for the opponent. Keep the returned watchCommand streaming in the background and call make-liar-dice-move when it is your turn.`
+  return `${prefix} Waiting for the opponent\'s bid. Keep the watchCommand streaming.`
 }
 
 function startedMessage(room: Room, userId: string): string {
@@ -76,7 +76,7 @@ function runningMessage(room: Room, userId: string): string {
 export default defineMcpTool({
   group: 'rooms',
   name: 'start-game',
-  description: 'Mark yourself ready in your current room, but only once the room is full (players = maxPlayers): until everyone has joined, calling it returns a watchCommand and does NOT mark you ready, so race games like 24 Point stay fair. It is the mandatory pre-game step for every game and every player must call it: each call marks that player ready (starting their personal race clock for 24 Point), and the game starts only once every seated player has called start-game. Calling it again while waiting is harmless. Returns immediately with a compact room summary (id, name, gameId, status, playerCount, maxPlayers) plus game-specific state: if the game just started, Gomoku black gets the board and is told to call make-gomoku-move, Gomoku white gets a watchCommand to wait for its turn, 24 Point gets the first question and is told to call make-24-point-move, and Liar\'s Dice tells the opener to make the first bid while the other player gets a watchCommand. If the opponent has not called start-game yet it returns a watchCommand that streams until the game starts.',
+  description: `Mark yourself ready in your current room. It is only effective once the room is full (players = maxPlayers): until then it returns a watchCommand and does NOT mark you ready, so race games stay fair. Every seated player must call it — the game starts only after everyone is ready (for 24 Point, each call also starts your personal race clock). Returns your side, whose turn it is, and the current board or challenge, plus a watchCommand whenever you need to wait.`,
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -101,7 +101,6 @@ export default defineMcpTool({
         room: toMcpRoomSummary(room),
         roomUrl: getRoomUrl(room.id),
         game,
-        ...(room.gameId === '24-point' && game.challenge ? { challenge: game.challenge } : {}),
       }
     }
     const presentStarted = (room: Room, message: string): Record<string, unknown> => {
@@ -121,7 +120,7 @@ export default defineMcpTool({
     const presentReady = (room: Room): Record<string, unknown> => {
       const readyCount = room.readySessionIds?.length ?? 0
       const watchCommand = getWatchCommand(room.id, tokenValue)
-      const message = `You are ready (${readyCount}/${room.maxPlayers}). Waiting for the opponent to call start-game; the game starts only when both players are ready. Keep the returned watchCommand streaming in the background — it pushes the game state when the game starts.`
+      const message = `You are ready (${readyCount}/${room.maxPlayers}). Waiting for the opponent to call start-game — keep the watchCommand streaming; it announces when the game starts.`
       return {
         message,
         ...present(room),
@@ -134,7 +133,7 @@ export default defineMcpTool({
     const presentNotFull = (room: Room): Record<string, unknown> => {
       const watchCommand = getWatchCommand(room.id, tokenValue)
       return {
-        message: `Room ${room.id} (${getGameName(room.gameId)}) is not full yet (${room.players.length}/${room.maxPlayers}). You are NOT marked ready until the room is full — call start-game again once everyone has joined so race clocks start fairly. Keep the returned watchCommand streaming in the background; it reports when the room is full ("Call start-game now").`,
+        message: `Room ${room.id} (${getGameName(room.gameId)}) is not full (${room.players.length}/${room.maxPlayers}) — you are NOT marked ready yet. Keep the watchCommand streaming and call start-game again once everyone has joined.`,
         ...present(room),
         readyCount: room.readySessionIds?.length ?? 0,
         maxPlayers: room.maxPlayers,

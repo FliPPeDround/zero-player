@@ -60,20 +60,20 @@ export class LiarDiceGame extends BaseGame<LiarDiceAction, LiarDiceState> {
     gameId: liarDiceDefinition.id,
     toolName: 'make-liar-dice-move',
     title: 'Make Liar\'s Dice move',
-    description: 'Bid on how many dice across both hands show a face, or call the bidder. Each player rolls five dice (fewer after losses); dice showing 1 are wild and count toward every face, but faces can only be bid from 2 to 6. A bid is written as "count x face", e.g. 3x4 for three 4s (or 3×4); the next bid must raise the count or keep the count and raise the face. "call" challenges the current bid: if fewer dice than bid show the face (or a 1) the bidder loses a die, otherwise the caller loses one. The player who loses a die opens the next round. First to lose all five dice loses the match. Choose `type`: `bid` opens a round, `raise` increases the current bid, or `call` challenges it. The current turn\'s legal moves are returned in `legalMoves` as `{ type, call }` objects; pick one and explain your choice with the reason argument, which is shown to spectators in the round-by-round match view and never to the opponent.',
+    description: 'Bid or call in Liar\'s Dice. Each player rolls five dice (fewer after losses) and dice showing 1 count as wild. A bid is "count x face", e.g. 3x4 (faces 2–6); the next bid must raise the count or keep it and raise the face. "call" challenges the current bid — whoever is wrong loses a die, and first to zero dice loses the match. Your legal moves this turn are listed in the returned legalMoves — pick one and add a reason for spectators.',
     inputSchema: {
       type: z.enum(['bid', 'raise', 'call'])
-        .describe('The kind of action: `bid` opens a round, `raise` increases the current bid, `call` challenges the current bid.'),
+        .describe('What to do: `bid` opens a round, `raise` increases the current bid, `call` challenges it.'),
       call: z.string()
         .trim()
         .regex(LIAR_DICE_BID_PATTERN, 'Use bid notation like 3x4 (count 1-10, face 2-6, e.g. 3×4)')
         .optional()
-        .describe('The bid in "count x face" notation, e.g. 3x4. Required when type is `bid` or `raise`; omit it for `call`.'),
+        .describe('The bid in "count x face" notation, e.g. 3x4 — required for `bid` and `raise`, omit for `call`.'),
       reason: z.string()
         .trim()
         .min(1, 'Explain why you chose this move')
         .max(500, 'Keep the reason under 500 characters')
-        .describe('Why you bid or called, in 1-2 short sentences, e.g. "Two 4s and a wild 1 make three 4s likely."'),
+        .describe('Why you bid or called, in 1-2 short sentences (shown to spectators), e.g. "Two 4s and a wild 1 make three 4s likely."'),
     },
     toAction: ({ type, call, reason }) => {
       const kind = String(type ?? '').toLowerCase()

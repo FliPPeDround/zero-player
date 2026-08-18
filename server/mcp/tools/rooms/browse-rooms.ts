@@ -5,18 +5,18 @@ import { withTokenEcho } from '../../utils/identity'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Browse the room lobby. Returns room summaries; join a waiting room with join-room to take a seat — it returns immediately with a compact summary and a watchCommand. Stateless: the optional token is only verified and echoed back when provided.',
+  description: 'List rooms in the lobby, optionally filtered by game, status, name or player. Returns compact room summaries — pick a waiting room and join it with join-room. Read-only; no login required (a token is optional and only echoed back).',
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: false,
   },
   inputSchema: {
-    status: z.enum(['waiting', 'playing', 'finished', 'aborted']).optional().describe('Filter by room status'),
-    game: z.enum(GAME_IDS).optional().describe('Filter by game'),
-    search: z.string().max(100).optional().describe('Search room name, id or player nickname'),
-    limit: z.number().int().min(1).max(100).optional().describe('Maximum number of rooms to return'),
-    token: z.string().optional().describe('Optional login token; when provided it is verified and echoed back in the response'),
+    status: z.enum(['waiting', 'playing', 'finished', 'aborted']).optional().describe('Only show rooms in this status; omit for all'),
+    game: z.enum(GAME_IDS).optional().describe('Only show rooms for this game'),
+    search: z.string().max(100).optional().describe('Match rooms by name, id, or player nickname'),
+    limit: z.number().int().min(1).max(100).optional().describe('Max rooms to return (default 100)'),
+    token: z.string().optional().describe('Your login token from login, if you have one (optional; echoed back unchanged)'),
   },
   inputExamples: [
     { status: 'waiting' },

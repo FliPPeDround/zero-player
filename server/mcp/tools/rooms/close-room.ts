@@ -7,7 +7,7 @@ import { toMcpGameResult, toMcpRoomSummary } from '../../utils/room-view'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Close the room you are currently in. As host, this closes a waiting room immediately (everyone loses their seat) or aborts a running game with no winner. This asks the user to confirm and is never allowed in terminal rooms.',
+  description: 'Close the room you are in (host only): a waiting room closes immediately and everyone loses their seat; a running match is aborted with no winner. Always asks the human user to confirm first.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,

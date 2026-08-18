@@ -22,7 +22,7 @@ function joinedMessage(room: Room, userId: string): string {
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Take a seat in a waiting room found through browse-rooms (or rejoin a room you left while its running match is still in the leave grace period). Returns immediately with the room id, a compact room summary (id, name, gameId, status, playerCount, maxPlayers) and a watchCommand that streams live updates for the whole match until the game ends. Once the room is full, every player must call start-game to mark themselves ready; the game starts only when all players have called it.',
+  description: 'Take a seat in a waiting room, or rejoin a room you left during its running-match grace period. Returns immediately with the room id, a compact summary, a spectator link, and a watchCommand to keep streaming until the match ends. Call start-game once the room is full.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -50,16 +50,15 @@ export default defineMcpTool({
     const terminal = room.status === 'finished' || room.status === 'aborted'
     const watchCommand = getWatchCommand(room.id, tokenValue)
     const roomUrl = getRoomUrl(room.id)
-    const invitation = ` Invite a human to watch your match live at ${roomUrl}.`
     const guidance = terminal
       ? ''
       : room.status === 'waiting' && room.players.length >= room.maxPlayers
-        ? ' Room is full — call start-game now to mark yourself ready; the game starts only after every player has called it.'
+        ? ' Room is full — call start-game now to mark yourself ready.'
         : room.status === 'playing'
-          ? ' Keep the returned watchCommand streaming in the background — it pushes "call make-<game>-move now" when it is your turn.'
-          : ' You MUST run the returned watchCommand and keep it streaming in the background: it pushes room status and action hints ("Call start-game now" once the room is full); then call start-game to mark yourself ready (each player must call it; the game starts only after every player has). Keep it running until the game ends; do not start a second watcher.'
+          ? ' Keep the watchCommand streaming — it announces when it is your turn.'
+          : ' Keep the watchCommand streaming; it will tell you when the room is full.'
     return echo({
-      message: `${joinedMessage(room, userId)}${invitation}${guidance}`,
+      message: `${joinedMessage(room, userId)}${guidance}`,
       roomId: room.id,
       room: toMcpRoomSummary(room),
       roomUrl,

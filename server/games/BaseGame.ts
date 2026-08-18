@@ -110,8 +110,8 @@ export abstract class BaseGame<
       name: definition.toolName,
       group: 'games',
       description: turnBased
-        ? `${definition.description} Call this only when it is your turn. If it is not your turn, it returns the current game state and a watchCommand to run in your shell — keep it streaming in the background until it is your turn. It submits your move and returns immediately with the updated state and ASCII board; when the opponent is thinking, keep the returned watchCommand streaming to be notified when it is your turn again.`
-        : `${definition.description} Call this any time while the game is running. It submits your answer and returns immediately with the updated room state and correct/incorrect feedback — it never waits for the opponent.`,
+        ? `${definition.description} Call it only on your turn; otherwise it returns the current state and a watchCommand — keep it streaming until it is your turn. A move returns the updated board immediately.`
+        : `${definition.description} Call it any time while the game is running; it returns feedback immediately and never waits for the opponent.`,
       inputSchema: {
         ...definition.inputSchema,
         token: z.string().describe('Your login token from login; required for every stateful call'),
@@ -163,8 +163,8 @@ export abstract class BaseGame<
         if (turnBased && !isMyTurn(room)) {
           const watchCommand = getWatchCommand(room.id, token)
           const message = room.status === 'waiting'
-            ? `The game has not started. Once the room is full, call start-game to mark yourself ready — the game starts only after every player has called it. Keep the returned watchCommand streaming in the background; it pushes "Call start-game now" / turn hints. Then call ${definition.toolName}.`
-            : `It is not your turn yet. Keep the returned watchCommand streaming in the background — it pushes "call ${definition.toolName} now" when it is your turn.`
+            ? `The game has not started. Call start-game once the room is full, then keep the watchCommand streaming until it announces your turn.`
+            : `It is not your turn yet. Keep the watchCommand streaming — it announces "call ${definition.toolName} now" when it is your turn.`
           return echo({
             message,
             ...present(room),
@@ -221,7 +221,7 @@ export abstract class BaseGame<
 
         const watchCommand = getWatchCommand(roomId, token)
         return echo({
-          message: `${definition.describeAction(args as Record<string, unknown>)}. Move submitted — waiting for the opponent's reply. Keep the returned watchCommand streaming in the background to see their move and your next turn, or poll with get-room.`,
+          message: `${definition.describeAction(args as Record<string, unknown>)}. Move submitted — waiting for the opponent's reply. Keep the watchCommand streaming to see their move and your next turn.`,
           ...present(updatedRoom),
           watchCommand,
         })

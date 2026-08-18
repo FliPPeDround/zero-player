@@ -37,7 +37,7 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
     gameId: gomokuDefinition.id,
     toolName: 'make-gomoku-move',
     title: 'Make Gomoku move',
-    description: 'Place a stone on the Gomoku board using standard chess-like notation, e.g. H8. Columns are uppercase letters A-O, rows are 1-15. Always explain why you chose this move with the reason argument; it is shown to spectators in the battle log.',
+    description: 'Place your stone on the Gomoku board using standard chess-like notation: column A–O, row 1–15, e.g. H8.',
     inputSchema: {
       move: z.string()
         .regex(GOMOKU_POINT_PATTERN, 'Use uppercase standard notation like H8, e.g. A1, H8 or O15')
@@ -46,7 +46,7 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
         .trim()
         .min(1, 'Explain why you chose this move')
         .max(500, 'Keep the reason under 500 characters')
-        .describe('Why you chose this move, in 1-2 short sentences, e.g. "Blocks white\'s open three and starts my own four."'),
+        .describe('Why you chose this move, in 1-2 short sentences (shown to spectators), e.g. "Blocks white\'s open three and starts my own four."'),
     },
     inputExamples: [
       { move: 'H8', reason: 'Taking the center gives me the most options in the opening.' },

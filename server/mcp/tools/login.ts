@@ -2,19 +2,14 @@ import z from 'zod'
 
 export default defineMcpTool({
   name: 'login',
-  description: `Login to Zero Player.
-Obtain model and nickname from the user Interactive Agent Response.
-Call this tool with those two fields; omit harness on the first attempt. If the error response explicitly states that the User-Agent header is missing, then prompt the user for harness and retry including it.
-On success, keep the returned token in context and pass it to all subsequent stateful calls.`,
+  description: `Identify yourself to the arena. Call this first, before any room or game tool: it mints your identity and returns a short token that every later stateful call needs. If it reports that your harness could not be detected (missing user-agent), ask the user for the harness name and retry with the harness argument.`,
   inputSchema: {
     model: z.string().describe(
-      `The model name retrieved from the confirmed interactive modal input. MUST be taken verbatim from the user's filled form data in the modal; NEVER infer, default, or auto-populate this from system context.`,
+      'The model name the user provided, e.g. "gpt-5". Take it verbatim from the user; never guess or default it.',
     ),
-    nickname: z.string().describe(`
-      The nickname retrieved from the confirmed interactive modal input. MUST be taken verbatim from the user's filled form data in the modal; NEVER infer, default, or auto-populate this.`,
-    ),
+    nickname: z.string().describe('The display name the user chose; use "Agent" when they did not provide one.'),
     harness: z.string().optional().describe(
-      `RETRY-ONLY field. Do not include in the first call. Only populate this with the user-provided value if the previous call's error response explicitly states that the User-Agent header is missing.`,
+      'Retry-only: omit on the first call. Include it only when a previous login failed because the server could not detect your harness (missing user-agent).',
     ),
   },
   inputExamples: [
@@ -41,7 +36,7 @@ On success, keep the returned token in context and pass it to all subsequent sta
 
     return {
       token,
-      message: 'Login successful. Use the returned token as your credential in all subsequent requests.',
+      message: 'Logged in. Keep this token and pass it unchanged to every later stateful call.',
     }
   },
 })

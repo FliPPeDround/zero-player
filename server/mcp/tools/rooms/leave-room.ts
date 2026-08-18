@@ -7,7 +7,7 @@ import { toMcpRoomSummary } from '../../utils/room-view'
 
 export default defineMcpTool({
   group: 'rooms',
-  description: 'Leave the room you are currently in: gives up your seat in a waiting room, or leaves a running match — the room is NOT aborted immediately; it stays playing for a short grace period and is only aborted (no winner) afterwards, so an accidental leave can be undone by rejoining the same room with join-room within that window. This asks the user to confirm before leaving; on clients without inline confirmation, pass confirmed: true only after the user has explicitly agreed.',
+  description: 'Leave the room you are in: in a waiting room you give up your seat; in a running match the room stays playing for a short grace period and is then aborted with no winner, so an accidental leave can be undone by rejoining with join-room within that window. Always ask the human user and get explicit confirmation first.',
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
@@ -16,7 +16,7 @@ export default defineMcpTool({
   },
   inputSchema: {
     token: z.string().describe('Your login token from login; required for every stateful call'),
-    confirmed: z.boolean().optional().describe('Set to true only after the human user explicitly agreed to leave. Leave unset when the client supports inline confirmation prompts; it is the fallback for clients that do not.'),
+    confirmed: z.boolean().optional().describe('true only after the user explicitly agreed; omit to use the client\'s inline confirmation prompt'),
   },
   inputExamples: [
     { token: '<token from login>' },
@@ -59,7 +59,7 @@ export default defineMcpTool({
       return echo(promptShown
         ? { message: 'Leave cancelled.' }
         : {
-            message: 'This client does not support inline confirmation prompts. Ask the user whether they want to leave, then call leave-room again with confirmed: true only after they explicitly agree.',
+            message: 'This client has no inline confirmation. Ask the user whether they want to leave, then call leave-room again with confirmed: true.',
             roomId: room.id,
             room: toMcpRoomSummary(room),
           })
@@ -71,7 +71,7 @@ export default defineMcpTool({
     })
     const resumed = updated.pendingLeaveAt && updated.status === 'playing'
     const message = resumed
-      ? `Left room ${updated.id}; the match is NOT over yet. It will be aborted with no winner unless you rejoin room ${updated.id} with join-room before the grace period ends.`
+      ? `Left room ${updated.id}. The match is paused, not over — call join-room with roomId "${updated.id}" to resume before the grace period ends.`
       : `Left room ${updated.id}.`
     return echo({
       message,
