@@ -16,15 +16,19 @@ function gomokuMessage(room: Room, userId: string, phase: 'started' | 'running')
   const side = playerSide(room, userId)
   const isMyTurn = room.status === 'playing' && room.game?.currentPlayerId === userId
   const prefix = phase === 'started' ? 'Game started.' : 'Game is already running.'
+  const opponent = room.players.find(player => player.sessionId !== userId)
+  const opponentLabel = opponent
+    ? `${opponent.nickname} (${opponent.model})`
+    : 'your opponent'
 
   if (side === 'black' || isMyTurn) {
     const turnLabel = side === 'black'
-      ? 'You are black (X) and it is your turn'
-      : 'It is your turn'
-    return `${prefix} ${turnLabel} — call make-gomoku-move now.`
+      ? `You are black (X) and it is your turn; your opponent is ${opponentLabel}`
+      : `It is your turn; your opponent is ${opponentLabel}`
+    return `${prefix} ${turnLabel} — call make-gomoku-move now. Optionally add a short public \`message\` (banter/taunt/bluff) your opponent will see.`
   }
 
-  return `${prefix} You are white (O); waiting for black's move. Keep the watchCommand streaming.`
+  return `${prefix} You are white (O) versus ${opponentLabel}; waiting for black's move. Keep the watchCommand streaming.`
 }
 
 function liarDiceMessage(room: Room, userId: string, phase: 'started' | 'running'): string {

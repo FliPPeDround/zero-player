@@ -26,6 +26,18 @@ function moveLabel(payload: Record<string, unknown>): string {
   return ''
 }
 
+/** Public banter sent by the mover; the primary content of a move entry. */
+function eventMessage(event: RoomEvent): string {
+  const message = event.payload?.message
+  return typeof message === 'string' ? message.trim() : ''
+}
+
+/** Private explanation shown only to spectators; rendered as a footnote. */
+function eventReason(event: RoomEvent): string {
+  const reason = event.payload?.reason
+  return typeof reason === 'string' ? reason.trim() : ''
+}
+
 /** Nickname of the Liar's Dice player who lost a die on a call, by seat slot. */
 function liarDiceLoserName(payload: Record<string, unknown>): string {
   const side = payload.loserSide
@@ -114,81 +126,87 @@ watch(() => props.room?.events.length, () => {
             class="first:border-t-0"
             :class="{ 'border-t border-mute': markerTypes.has(event.type) }"
           >
-            <!-- Move: identity and move share one header line; the reason sits below -->
+            <!-- Move: chat-style entry; the public message is the bubble, the private reason sits above it -->
             <div
               v-if="event.type === 'move' && event.payload"
-              class="px-3 py-2 flex gap-2.5"
+              class="px-3 py-2 flex flex-col gap-1 min-w-0"
             >
-              <DisplayAvatar
-                :name="event.actor ?? eventMeta.move.label"
-                :size="22"
-                class="mt-0.5 shrink-0"
-                :class="[moveAvatarClass(event)]"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="flex gap-x-1.5 min-w-0 items-center">
-                  <span class="text-compact color-base font-medium min-w-0 truncate">
-                    {{ event.actor ?? eventMeta.move.label }}
+              <div class="flex gap-x-1.5 max-w-full min-w-0 items-center">
+                <DisplayAvatar
+                  :name="event.actor ?? eventMeta.move.label"
+                  :size="18"
+                  class="shrink-0"
+                  :class="[moveAvatarClass(event)]"
+                />
+                <span class="text-compact color-base font-medium min-w-0 truncate">
+                  {{ event.actor ?? eventMeta.move.label }}
+                </span>
+                <span class="text-mini color-faint shrink-0" aria-hidden="true">·</span>
+                <DisplayNumberBadge
+                  :value="moveNumbers.get(event.id) ?? 0"
+                  prefix="#"
+                  class="shrink-0"
+                />
+                <template v-if="event.payload.type === 'place'">
+                  <span class="text-sm color-base font-medium font-mono shrink-0">
+                    {{ moveLabel(event.payload) }}
                   </span>
-                  <span class="text-mini color-faint shrink-0" aria-hidden="true">·</span>
-                  <DisplayNumberBadge
-                    :value="moveNumbers.get(event.id) ?? 0"
-                    prefix="#"
-                    class="shrink-0"
-                  />
-                  <template v-if="event.payload.type === 'place'">
-                    <span class="text-sm color-base font-medium font-mono shrink-0">
-                      {{ moveLabel(event.payload) }}
-                    </span>
-                  </template>
-                  <template v-else-if="event.payload.type === 'bid'">
-                    <span class="text-sm color-base font-medium font-mono shrink-0">
-                      {{ moveLabel(event.payload) }}
-                    </span>
-                  </template>
-                  <template v-else-if="event.payload.type === 'call'">
-                    <span class="text-sm color-base font-medium font-mono shrink-0">
-                      {{ moveLabel(event.payload) }}
-                    </span>
-                  </template>
-                  <template v-else>
-                    <span class="text-sm color-base font-medium font-mono shrink-0">
-                      {{ event.payload.expression ?? event.payload.move }}
-                    </span>
-                  </template>
-                  <span class="flex-1" aria-hidden="true" />
-                  <AppDate
-                    :date="event.at"
-                    :live="room?.status === 'playing'"
-                    class="text-mini color-faint shrink-0"
-                  />
-                </div>
-                <div
-                  v-if="event.payload.type === 'answer'"
-                  class="text-mini color-muted font-mono mt-0.5 tabular-nums"
-                >
-                  Q{{ event.payload.question ?? '?' }} ·
-                  {{ event.payload.correct ? t('log.correct') : t('log.wrong') }}
-                  <template v-if="typeof event.payload.feedback === 'string' && event.payload.feedback">
-                    · {{ event.payload.feedback }}
-                  </template>
-                </div>
-                <div
-                  v-if="event.payload.type === 'call' && typeof event.payload.total === 'number'"
-                  class="text-mini color-muted font-mono mt-0.5 tabular-nums"
-                >
-                  {{ event.payload.correct ? t('log.held') : t('log.bluff') }} · {{ t('log.total', { count: event.payload.total }) }}
-                  <template v-if="liarDiceLoserName(event.payload)">
-                    · {{ t('log.losesDie', { name: liarDiceLoserName(event.payload) }) }}
-                  </template>
-                </div>
-                <p
-                  v-if="typeof event.payload.reason === 'string' && event.payload.reason"
-                  class="text-compact color-muted mt-1 pl-2 border-l border-mute whitespace-pre-wrap break-words"
-                >
-                  {{ event.payload.reason }}
-                </p>
+                </template>
+                <template v-else-if="event.payload.type === 'bid'">
+                  <span class="text-sm color-base font-medium font-mono shrink-0">
+                    {{ moveLabel(event.payload) }}
+                  </span>
+                </template>
+                <template v-else-if="event.payload.type === 'call'">
+                  <span class="text-sm color-base font-medium font-mono shrink-0">
+                    {{ moveLabel(event.payload) }}
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="text-sm color-base font-medium font-mono shrink-0">
+                    {{ event.payload.expression ?? event.payload.move }}
+                  </span>
+                </template>
+                <span class="flex-1" aria-hidden="true" />
+                <AppDate
+                  :date="event.at"
+                  :live="room?.status === 'playing'"
+                  class="text-mini color-faint shrink-0"
+                />
               </div>
+              <!-- Private reason: quiet, smaller, above the message -->
+              <p
+                v-if="eventReason(event)"
+                class="text-mini color-faint pl-2 border-l border-mute whitespace-pre-wrap break-words"
+              >
+                {{ eventReason(event) }}
+              </p>
+              <div
+                v-if="event.payload.type === 'answer'"
+                class="text-mini color-muted font-mono tabular-nums"
+              >
+                Q{{ event.payload.question ?? '?' }} ·
+                {{ event.payload.correct ? t('log.correct') : t('log.wrong') }}
+                <template v-if="typeof event.payload.feedback === 'string' && event.payload.feedback">
+                  · {{ event.payload.feedback }}
+                </template>
+              </div>
+              <div
+                v-if="event.payload.type === 'call' && typeof event.payload.total === 'number'"
+                class="text-mini color-muted font-mono tabular-nums"
+              >
+                {{ event.payload.correct ? t('log.held') : t('log.bluff') }} · {{ t('log.total', { count: event.payload.total }) }}
+                <template v-if="liarDiceLoserName(event.payload)">
+                  · {{ t('log.losesDie', { name: liarDiceLoserName(event.payload) }) }}
+                </template>
+              </div>
+              <!-- Public banter: the chat bubble, the main content of the entry -->
+              <p
+                v-if="eventMessage(event)"
+                class="text-sm color-base px-2.5 py-1.5 rounded-lg bg-secondary max-w-[85%] whitespace-pre-wrap break-words"
+              >
+                {{ eventMessage(event) }}
+              </p>
             </div>
             <!-- Lifecycle markers: quiet bands that split the feed into phases -->
             <div

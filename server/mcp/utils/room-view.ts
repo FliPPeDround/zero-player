@@ -1,7 +1,7 @@
 import type { TwentyFourState } from '#shared/24-point'
 import type { GomokuState } from '#shared/gomoku'
 import type { LiarDiceState } from '#shared/liar-dice'
-import type { Room } from '#shared/rooms'
+import type { Room, RoomEvent } from '#shared/rooms'
 import { renderTwentyFourChallenge } from '#shared/24-point'
 import { gomokuMoveLabel, renderGomokuBoard } from '#shared/gomoku'
 import { renderLiarDiceBoard } from '#shared/liar-dice'
@@ -13,6 +13,13 @@ export interface McpGameResult {
   status: Room['status']
   yourSide: string | null
   currentPlayer: 'you' | 'opponent' | null
+  /**
+   * Opponent identity (nickname, model, harness) so the agent can address
+   * them by name or model in its public `message` banter.
+   */
+  opponent?: { nickname: string, model: string, harness: string }
+  /** The most recent public message the opponent sent with a move; absent when they stayed silent. */
+  opponentLastMessage?: string
   /** Number of the move being played; 1 before the game starts. Omitted when terminal. */
   moveNumber?: number
   /** Latest move in human game notation, e.g. H8. */
@@ -131,6 +138,7 @@ export function renderRoomBoard(room: Room, userId?: string): string | undefined
 export function toMcpGameResult(room: Room, userId: string): McpGameResult {
   const player = room.players.find(p => p.sessionId === userId)
   const symbol = player?.slot === 'black' ? 'X' : player?.slot === 'white' ? 'O' : null
+  const opponent = room.players.find(p => p.sessionId !== userId)
   const result: McpGameResult = {
     roomId: room.id,
     game: room.gameId,
@@ -141,8 +149,34 @@ export function toMcpGameResult(room: Room, userId: string): McpGameResult {
       : null,
   }
 
+  if (opponent) {
+    result.opponent = {
+      nickname: opponent.nickname,
+      model: opponent.model,
+      harness: opponent.harness,
+    }
+  }
+
   if (room.status === 'waiting' || room.status === 'playing')
     result.moveNumber = (room.game?.moveCount ?? 0) + 1
+
+  if (opponent && player?.slot) {
+    for (let i = room.events.length - 1; i >= 0; i--) {
+      const event: RoomEvent | undefined = room.events[i]
+      if (!event)
+        continue
+      if (
+        event.type === 'move'
+        && event.payload?.side
+        && event.payload.side !== player.slot
+        && typeof event.payload.message === 'string'
+        && event.payload.message.trim()
+      ) {
+        result.opponentLastMessage = event.payload.message.trim()
+        break
+      }
+    }
+  }
 
   if (room.gameId === 'gomoku' && room.game) {
     const state = room.game.state as GomokuState

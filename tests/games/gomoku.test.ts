@@ -11,6 +11,8 @@ interface GomokuPayload {
   status: 'waiting' | 'playing' | 'finished' | 'aborted'
   message?: string
   currentPlayer: 'you' | 'opponent' | null
+  opponent?: { nickname: string, model: string, harness: string }
+  opponentLastMessage?: string
   moveNumber?: number
   lastMove?: string
   board?: string
@@ -40,6 +42,9 @@ defineGameFlowSuite(
       expect(room.game.finishReason).toBe('five-in-row')
       expect(winLine).toHaveLength(5)
       expect(room.game.moveCount).toBe(9)
+      const lastMoveEvent = room.events.filter(event => event.type === 'move').at(-1)
+      expect(lastMoveEvent?.payload?.message).toBe('黑方嘲讽 5')
+      expect(lastMoveEvent?.payload?.reason).toBe('测试脚本第 9 手')
     },
   },
   async (match) => {
@@ -52,18 +57,37 @@ defineGameFlowSuite(
     expect(room.status, `对局尚未开始：请按链路顺序先运行「步骤 5」。${CHAIN_HINT}`).toBe('playing')
 
     let finalMove: GomokuPayload | undefined
+    let blackCount = 0
+    let whiteCount = 0
     for (let i = 0; i < 9; i++) {
       const isBlack = i % 2 === 0
       const agent = isBlack ? match.agentA : match.agentB
       const move = isBlack ? BLACK_MOVES[i / 2]! : WHITE_MOVES[(i - 1) / 2]!
+      const message = isBlack ? `黑方嘲讽 ${blackCount + 1}` : `白方回敬 ${whiteCount + 1}`
+      const opponentLastMessage = i === 0
+        ? undefined
+        : isBlack
+          ? `白方回敬 ${whiteCount}`
+          : `黑方嘲讽 ${blackCount}`
       const result = await agent.call<GomokuPayload>('make-gomoku-move', {
         move,
         reason: `测试脚本第 ${i + 1} 手`,
+        message,
       })
       expect(result.status).toBe(i === 8 ? 'finished' : 'playing')
       expect(result.lastMove).toBe(move)
       if (i < 8)
         expect(result.moveNumber).toBe(i + 2)
+      const opponentNickname = isBlack ? match.nicknames[1] : match.nicknames[0]
+      expect(result.opponent?.nickname).toBe(opponentNickname)
+      expect(result.opponent?.model).toBeTruthy()
+      expect(result.opponentLastMessage).toBe(opponentLastMessage)
+      if (isBlack)
+        blackCount++
+      else
+        whiteCount++
+      if (i === 1)
+        console.log(`白方收到黑方首手 message: ${result.opponentLastMessage}`)
       console.log(`\n===== ${agent.label} 落子 ${move} 后的棋盘（第 ${i + 1} 手）=====`)
       console.log(result.board ?? '(无棋盘)')
       finalMove = result

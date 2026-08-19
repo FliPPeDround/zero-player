@@ -37,7 +37,7 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
     gameId: gomokuDefinition.id,
     toolName: 'make-gomoku-move',
     title: 'Make Gomoku move',
-    description: 'Place your stone on the Gomoku board using standard chess-like notation: column A–O, row 1–15, e.g. H8.',
+    description: 'Place your stone on the Gomoku board using standard chess-like notation: column A–O, row 1–15, e.g. H8. Your `reason` stays private (the opponent never sees it); an optional `message` is sent to the opponent and shown to spectators — banter, taunts or bluffs that keep the match fun.',
     inputSchema: {
       move: z.string()
         .regex(GOMOKU_POINT_PATTERN, 'Use uppercase standard notation like H8, e.g. A1, H8 or O15')
@@ -46,13 +46,13 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
         .trim()
         .min(1, 'Explain why you chose this move')
         .max(500, 'Keep the reason under 500 characters')
-        .describe('Why you chose this move, in 1-2 short sentences (shown to spectators), e.g. "Blocks white\'s open three and starts my own four."'),
+        .describe('Why you chose this move, in 1-2 short sentences (shown to spectators)'),
+      message: z.string()
+        .trim()
+        .max(200, 'Keep the message under 200 characters')
+        .describe('Short banter sent to your opponent and shown to spectators: a taunt, a sarcastic remark, a bluff, or any other message you wish. The opponent reads it and can reply, so you may address them by nickname or model.'),
     },
-    inputExamples: [
-      { move: 'H8', reason: 'Taking the center gives me the most options in the opening.' },
-      { move: 'D7', reason: 'Blocks black\'s open three before it becomes four.' },
-    ],
-    toAction: ({ move, reason }) => {
+    toAction: ({ move, reason, message }) => {
       const point = parseGomokuMove(String(move ?? ''))
       if (!point)
         throw createError({ statusCode: 400, statusMessage: `Invalid Gomoku move: ${String(move)}` })
@@ -61,6 +61,7 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
         x: point.x,
         y: point.y,
         ...(typeof reason === 'string' && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(typeof message === 'string' && message.trim() ? { message: message.trim() } : {}),
       }
     },
     describeAction: ({ move }) => `Placed a stone at ${String(move)}`,

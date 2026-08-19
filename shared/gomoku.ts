@@ -23,6 +23,13 @@ export interface GomokuAction extends GameActionRecord {
   y: number
   /** Optional agent-provided explanation shown to spectators in the battle log. */
   reason?: string
+  /**
+   * Optional short message sent to the opponent and shown to spectators:
+   * banter, taunts or bluffs that make the match entertaining. Unlike
+   * `reason`, this is public — the opponent's AI reads it through the watch
+   * stream and can reply in character.
+   */
+  message?: string
 }
 
 export interface GomokuState {

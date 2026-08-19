@@ -129,13 +129,19 @@ export default defineEventHandler(async (event) => {
 
   const gameStatusMessage = (room: Room, userIdValue: string): string => {
     const result = toMcpGameResult(room, userIdValue)
+    const opponentLabel = result.opponent
+      ? `${result.opponent.nickname} (${result.opponent.model})`
+      : 'the opponent'
     if (isTerminal(room))
       return describeRoomOutcome(room, userIdValue)
     if (room.status === 'playing' && room.game?.currentPlayerId === userIdValue) {
       if (room.gameId === 'gomoku') {
-        return result.lastMove
-          ? `Opponent moved at ${result.lastMove}. It is your turn — call make-gomoku-move now.`
-          : 'It is your turn — call make-gomoku-move now.'
+        if (!result.lastMove)
+          return 'It is your turn — call make-gomoku-move now.'
+        const said = result.opponentLastMessage
+          ? ` and said: "${result.opponentLastMessage}"`
+          : ''
+        return `Opponent ${opponentLabel} moved at ${result.lastMove}${said}. It is your turn — call make-gomoku-move now.`
       }
       return `It is your turn — call make-${room.gameId}-move now.`
     }

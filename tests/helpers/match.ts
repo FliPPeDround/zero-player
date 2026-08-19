@@ -35,7 +35,7 @@ export interface RestRoom {
   status: string
   winner?: string
   players: Array<{ sessionId: string, nickname: string }>
-  events: Array<{ type: string }>
+  events: Array<{ type: string, payload?: Record<string, unknown> }>
   game: {
     status: string
     finishReason?: string
