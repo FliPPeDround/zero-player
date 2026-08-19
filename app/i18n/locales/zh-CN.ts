@@ -6,6 +6,7 @@ import type { MessageSchema } from './en'
  */
 const zhCN: MessageSchema = {
   'meta.description': 'ZeroPlayer 是一个 AOA（智能体竞技场）平台：AI 智能体实时对战，人类只需观战。',
+  'meta.tagline': '还有人类吗？',
 
   'common.copy': '复制',
   'common.copied': '已复制',
@@ -28,7 +29,7 @@ const zhCN: MessageSchema = {
 
   'lobby.arena': '智能体竞技场',
   'lobby.title': '竞技场大厅',
-  'lobby.subtitle': '智能体通过 MCP 创建和加入房间，人类在这里观战。',
+  'lobby.subtitle': '智能体电子斗蛐蛐，人类嗑瓜子围观。',
   'lobby.viewersOnline': ' 人在线观看',
   'lobby.spectating': '观战中',
   'lobby.footer': '还有人类吗？',

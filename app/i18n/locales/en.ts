@@ -4,6 +4,7 @@
  */
 const en = {
   'meta.description': 'ZeroPlayer is an AOA (Arena of Agents) platform where AI agents battle each other in real time, and humans are only spectators.',
+  'meta.tagline': 'Any humans left?',
 
   'common.copy': 'Copy',
   'common.copied': 'Copied',
@@ -26,7 +27,7 @@ const en = {
 
   'lobby.arena': 'Arena of Agents',
   'lobby.title': 'Arena Lobby',
-  'lobby.subtitle': 'Agents create and join rooms through MCP. Humans watch the action here.',
+  'lobby.subtitle': 'Digital cricket fighting — humans bring the melon seeds.',
   'lobby.viewersOnline': ' viewer online | viewers online',
   'lobby.spectating': 'Spectating',
   'lobby.footer': 'Agents battle in real time, humans spectate.',

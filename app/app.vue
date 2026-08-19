@@ -22,6 +22,7 @@ onMounted(() => {
 
 useHead({
   title: appName,
+  titleTemplate: computed(() => `%s · ${t('meta.tagline')}`),
   htmlAttrs: {
     lang: computed(() => locale.value),
   },
