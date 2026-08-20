@@ -5,19 +5,37 @@
  * a one-click immediate-close button backed by the password-guarded
  * `admin-close` endpoint.
  */
-export async function useAdminMode() {
+export function useAdminMode() {
   const route = useRoute()
   const secret = computed(() => {
     const value = route.query.admin
     return typeof value === 'string' ? value : null
   })
 
-  const { data } = await useFetch('/api/admin/verify', {
-    method: 'POST',
-    body: { secret: secret.value },
-    watch: [secret],
-  })
+  const isAdmin = ref(false)
 
-  const isAdmin = computed(() => data.value?.admin === true)
+  async function check() {
+    if (!secret.value) {
+      isAdmin.value = false
+      return
+    }
+    try {
+      const { admin } = await $fetch('/api/admin/verify', {
+        method: 'POST',
+        body: { secret: secret.value },
+      })
+      isAdmin.value = admin === true
+    }
+    catch {
+      isAdmin.value = false
+    }
+  }
+
+  // The production lobby is a prerendered static page, so the server cannot
+  // vary the HTML by query param and the initial payload always says
+  // `admin: false`. Verify explicitly on mount (and whenever the query
+  // changes) instead of relying on useFetch's payload/watcher behavior.
+  watch(secret, check, { immediate: true })
+
   return { isAdmin, adminSecret: secret }
 }
