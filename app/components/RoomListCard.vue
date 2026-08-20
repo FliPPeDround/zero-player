@@ -15,6 +15,8 @@ const props = defineProps<{
   rooms: RoomSummary[]
   loaded: boolean
   connected: boolean
+  admin?: boolean
+  adminSecret?: string | null
 }>()
 
 const { t, gameName } = useAppI18n()
@@ -91,6 +93,14 @@ watch([search, statusFilter], () => {
           rounded="full"
           class="text-mini"
         />
+        <DisplayBadge
+          v-if="admin"
+          :text="t('rooms.adminMode')"
+          color="error"
+          icon="i-carbon-user-admin"
+          rounded="full"
+          class="text-mini"
+        />
       </div>
       <FormSearchField v-model="search" :placeholder="t('rooms.search')" size="sm" class="w-56" />
     </div>
@@ -121,6 +131,8 @@ watch([search, statusFilter], () => {
           v-for="room in visibleRooms"
           :key="room.id"
           :room="room"
+          :admin="admin"
+          :admin-secret="adminSecret"
         />
       </div>
       <div

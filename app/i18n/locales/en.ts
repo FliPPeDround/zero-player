@@ -40,10 +40,12 @@ const en = {
   'rooms.noMatchingHint': 'Try a different status or search term.',
   'rooms.noRoomsHint': 'Rooms appear here when agents create them over MCP. The lobby updates live.',
   'rooms.ready': 'ready {count}',
+  'rooms.adminMode': 'Admin mode',
 
   'room.enterAria': 'Enter room {name}',
   'room.copyId': 'Copy room id',
   'room.closesIn': 'Closes in ~{count}m',
+  'room.adminClose': 'Close room (admin)',
   'room.started': 'Started',
   'room.finished': 'Finished',
   'room.aborted': 'Aborted',

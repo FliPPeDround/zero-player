@@ -648,6 +648,16 @@ export async function closeRoom(roomId: string, agent: AgentIdentity): Promise<R
 }
 
 /**
+ * Admin-only immediate close. Unlike `closeRoom`, this removes the room in
+ * any state right away (including a running match) instead of aborting it
+ * into the terminal retention window. Guarded by the admin password check
+ * in the `admin-close` REST endpoint.
+ */
+export async function adminCloseRoom(roomId: string): Promise<Room | null> {
+  return await deleteRoom(roomId, 'admin-closed', 'admin')
+}
+
+/**
  * Periodic sweep called by the `rooms:cleanup` task. Rooms past their
  * `closesAt` are closed: running games are aborted first (timeout) and enter
  * the terminal retention window; everything else is deleted and broadcast.

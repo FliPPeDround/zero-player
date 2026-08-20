@@ -3,6 +3,7 @@ import { wsAutoReconnect } from '~/composables/rooms'
 
 const { rooms, loaded, connected, open, close } = await useRoomListFeed()
 const { t } = useAppI18n()
+const { isAdmin, adminSecret } = await useAdminMode()
 
 const visitors = ref(0)
 const { open: openVisitors, close: closeVisitors } = useWebSocket('/ws/visitors', {
@@ -40,6 +41,12 @@ const stats = computed(() => [
 <template>
   <div class="flex flex-col gap-6">
     <LobbyHero :visitors="visitors" :stats="stats" />
-    <RoomListCard :rooms="rooms" :loaded="loaded" :connected="connected" />
+    <RoomListCard
+      :rooms="rooms"
+      :loaded="loaded"
+      :connected="connected"
+      :admin="isAdmin"
+      :admin-secret="adminSecret"
+    />
   </div>
 </template>

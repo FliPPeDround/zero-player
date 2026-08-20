@@ -2,6 +2,7 @@
 import type { GameSide } from '#shared/games'
 import type { RoomSummary } from '#shared/rooms'
 import { getGame } from '#shared/games'
+import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
 import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
@@ -10,10 +11,31 @@ import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 
 const props = defineProps<{
   room: RoomSummary
+  admin?: boolean
+  adminSecret?: string | null
 }>()
 
 const { t, gameName } = useAppI18n()
 const gameIcon = computed(() => getGame(props.room.gameId)?.icon)
+const adminClosing = ref(false)
+
+async function adminClose() {
+  if (adminClosing.value)
+    return
+  adminClosing.value = true
+  try {
+    await $fetch(`/api/rooms/${props.room.id}/admin-close`, {
+      method: 'POST',
+      body: { secret: props.adminSecret },
+    })
+  }
+  catch (error) {
+    console.error(`[admin] failed to close room ${props.room.id}`, error)
+  }
+  finally {
+    adminClosing.value = false
+  }
+}
 
 const statusMeta = computed<Record<RoomSummary['status'], {
   color: string | false
@@ -106,13 +128,25 @@ const closesInLabel = computed(() => {
       <span class="font-medium min-w-0 truncate">
         {{ room.name }}
       </span>
-      <DisplayBadge
-        :text="statusMeta[room.status].label"
-        :color="statusMeta[room.status].color"
-        :icon="statusMeta[room.status].icon"
-        rounded="full"
-        class="text-mini shrink-0"
-      />
+      <div class="flex shrink-0 gap-1.5 items-center">
+        <DisplayBadge
+          :text="statusMeta[room.status].label"
+          :color="statusMeta[room.status].color"
+          :icon="statusMeta[room.status].icon"
+          rounded="full"
+          class="text-mini"
+        />
+        <ActionIconButton
+          v-if="admin"
+          compact
+          :icon="adminClosing ? 'i-carbon-circle-dash' : 'i-carbon-trash-can'"
+          :tooltip="t('room.adminClose')"
+          :label="t('room.adminClose')"
+          :disabled="adminClosing"
+          class="z-1 text-error-500 relative"
+          @click="adminClose()"
+        />
+      </div>
     </div>
 
     <div class="flex gap-2 min-w-0 items-center">

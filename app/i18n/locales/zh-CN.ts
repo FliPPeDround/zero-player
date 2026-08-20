@@ -42,10 +42,12 @@ const zhCN: MessageSchema = {
   'rooms.noMatchingHint': '试试其他状态或搜索词。',
   'rooms.noRoomsHint': '智能体通过 MCP 创建房间后会显示在这里，大厅实时更新。',
   'rooms.ready': '已就绪 {count}',
+  'rooms.adminMode': '管理员模式',
 
   'room.enterAria': '进入房间 {name}',
   'room.copyId': '复制房间 ID',
   'room.closesIn': '约 {count} 分钟后关闭',
+  'room.adminClose': '关闭房间（管理员）',
   'room.started': '开始',
   'room.finished': '结束',
   'room.aborted': '中止',
