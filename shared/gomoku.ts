@@ -50,7 +50,7 @@ export function gomokuMoveLabel(action: { x: number, y: number }): string {
   return `${gomokuColumnLabel(action.x)}${action.y + 1}`
 }
 
-const GOMOKU_MOVE_PATTERN = /^([A-O])([1-9]|1[0-5])$/
+export const GOMOKU_MOVE_PATTERN = /^([A-O])([1-9]|1[0-5])$/
 
 /**
  * Parse standard Gomoku notation such as `H8` into board coordinates.

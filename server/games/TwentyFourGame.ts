@@ -186,11 +186,6 @@ export class TwentyFourGame extends BaseGame<TwentyFourAction, TwentyFourState> 
     }
   }
 
-  getLegalActions(_playerId: string): TwentyFourAction[] {
-    // Expressions are an unbounded space; the engine validates them directly.
-    return []
-  }
-
   protected override getMoveMetadata(playerId: string, _action: TwentyFourAction): Record<string, unknown> | undefined {
     const last = this.state.lastResult
     if (!last || last.playerId !== playerId)

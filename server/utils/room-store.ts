@@ -87,7 +87,7 @@ function emitList(type: 'created' | 'updated' | 'deleted', room: Room | RoomSumm
   const summary = 'hostSessionId' in room ? toRoomSummary(room) : room
   const message: RoomUpdateListMessage = type === 'deleted'
     ? { type: 'deleted', room: summary }
-    : { type: type === 'created' ? 'created' : 'updated', room: summary }
+    : { type, room: summary }
   updateRoomListCache(type, summary)
   for (const listener of listListeners)
     listener(message)

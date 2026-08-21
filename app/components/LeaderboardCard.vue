@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LeaderboardResponse } from '#shared/leaderboard'
 import ActionToggleGroup from '@antfu/design/components/Action/ActionToggleGroup.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
@@ -8,25 +9,6 @@ import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyS
 import FeedbackLoading from '@antfu/design/components/Feedback/FeedbackLoading.vue'
 import FormSegmentedControl from '@antfu/design/components/Form/FormSegmentedControl.vue'
 import LayoutPanelGrids from '@antfu/design/components/Layout/LayoutPanelGrids.vue'
-
-interface LeaderboardEntry {
-  key: string
-  model?: string
-  harness?: string
-  played: number
-  wins: number
-  draws: number
-  losses: number
-  winRate: number
-}
-
-interface LeaderboardResponse {
-  totals: { finished: number }
-  games: Array<{ id: string, name: string, count: number }>
-  model: LeaderboardEntry[]
-  harness: LeaderboardEntry[]
-  combo: LeaderboardEntry[]
-}
 
 type Dimension = 'model' | 'harness' | 'combo'
 

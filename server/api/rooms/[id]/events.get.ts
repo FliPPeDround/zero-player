@@ -8,11 +8,6 @@ import { renderRoomBoard, toMcpGameResult, toMcpRoomView } from '../../../mcp/ut
 import { resolveAgentFromToken } from '../../../utils/agent'
 import { getRoom, onRoomDetail } from '../../../utils/room-store'
 
-const POLL_INITIAL_INTERVAL_MS = 5000
-const POLL_MEDIUM_INTERVAL_MS = 10_000
-const POLL_MAX_INTERVAL_MS = 15_000
-const POLL_FAST_WINDOW_MS = 30_000
-const POLL_MEDIUM_WINDOW_MS = 90_000
 const HEARTBEAT_INTERVAL_MS = 30_000
 
 function isTerminal(room: Room): boolean {
@@ -159,11 +154,8 @@ export default defineEventHandler(async (event) => {
   }
 
   let stopped = false
-  let pollTimer: ReturnType<typeof setTimeout> | undefined
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined
   let unsubscribe: () => void = () => {}
-  const startedAt = Date.now()
-  let lastKey = `${initial.updatedAt}|${initial.events.length}`
   let lastEventCount = initial.events.length
   let lastStatus = initial.status
 
@@ -171,8 +163,6 @@ export default defineEventHandler(async (event) => {
     if (stopped)
       return
     stopped = true
-    if (pollTimer)
-      clearTimeout(pollTimer)
     if (heartbeatTimer)
       clearInterval(heartbeatTimer)
     unsubscribe()
@@ -239,7 +229,6 @@ export default defineEventHandler(async (event) => {
     const room = message.room
     const prevStatus = lastStatus
     lastStatus = room.status
-    lastKey = `${room.updatedAt}|${room.events.length}`
     const newEvents = room.events.slice(lastEventCount)
     lastEventCount = room.events.length
 
@@ -265,65 +254,6 @@ export default defineEventHandler(async (event) => {
       void pushed.then(stop)
   })
 
-  const schedulePoll = (elapsedMs: number): void => {
-    if (stopped)
-      return
-    const delayMs = elapsedMs < POLL_FAST_WINDOW_MS
-      ? POLL_INITIAL_INTERVAL_MS
-      : elapsedMs < POLL_MEDIUM_WINDOW_MS
-        ? POLL_MEDIUM_INTERVAL_MS
-        : POLL_MAX_INTERVAL_MS
-    pollTimer = setTimeout(() => {
-      void (async () => {
-        if (stopped)
-          return
-        const room = await getRoom(id)
-        if (stopped)
-          return
-        if (!room) {
-          await sendJson({ type: 'closed', roomId: id, message: 'Room closed.' })
-          stop()
-          return
-        }
-        const prevStatus = lastStatus
-        lastStatus = room.status
-        const key = `${room.updatedAt}|${room.events.length}`
-        if (key !== lastKey) {
-          lastKey = key
-          const newEvents = room.events.slice(lastEventCount)
-          lastEventCount = room.events.length
-          if (room.status === 'waiting') {
-            emitWaitingEvents(room, newEvents)
-            schedulePoll(Date.now() - startedAt)
-            return
-          }
-          if (prevStatus === 'waiting') {
-            presentGameStarted(room, 'update')
-            return
-          }
-          if (userId && tokenValue) {
-            await sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
-            if (isTerminal(room)) {
-              stop()
-              return
-            }
-            schedulePoll(Date.now() - startedAt)
-            return
-          }
-          await sendJson(presentFull('update', room))
-          if (isTerminal(room)) {
-            stop()
-            return
-          }
-        }
-        schedulePoll(Date.now() - startedAt)
-      })().catch((error) => {
-        console.error('[rooms] SSE poll failed:', error)
-        stop()
-      })
-    }, delayMs)
-  }
-
   heartbeatTimer = setInterval(() => {
     if (!stopped)
       void stream.push({ event: 'ping', data: '' }).catch(() => {})
@@ -331,8 +261,6 @@ export default defineEventHandler(async (event) => {
 
   stream.onClosed(() => {
     stopped = true
-    if (pollTimer)
-      clearTimeout(pollTimer)
     if (heartbeatTimer)
       clearInterval(heartbeatTimer)
     unsubscribe()
@@ -346,22 +274,17 @@ export default defineEventHandler(async (event) => {
   if (initial.status === 'waiting') {
     const snapshot = presentWaiting(initial)
     void sendJson(snapshot)
-    schedulePoll(0)
   }
   else {
     if (userId && tokenValue) {
       void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
       if (isTerminal(initial))
         stop()
-      else
-        schedulePoll(0)
     }
     else {
       void sendJson(presentFull('snapshot', initial))
       if (isTerminal(initial))
         stop()
-      else
-        schedulePoll(0)
     }
   }
 

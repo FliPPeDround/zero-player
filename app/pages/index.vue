@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { wsAutoReconnect } from '~/composables/rooms'
 
-const { rooms, loaded, connected, open, close } = await useRoomListFeed()
+const { rooms, connected, open, close } = await useRoomListFeed()
 const { t } = useAppI18n()
 const { isAdmin, adminSecret } = useAdminMode()
 
@@ -43,7 +43,6 @@ const stats = computed(() => [
     <LobbyHero :visitors="visitors" :stats="stats" />
     <RoomListCard
       :rooms="rooms"
-      :loaded="loaded"
       :connected="connected"
       :admin="isAdmin"
       :admin-secret="adminSecret"

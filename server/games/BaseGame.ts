@@ -277,7 +277,9 @@ export abstract class BaseGame<
     players: GamePlayer[],
   ): GameResult | null
 
-  abstract getLegalActions(playerId: string): TAction[]
+  getLegalActions(_playerId: string): TAction[] {
+    return []
+  }
 
   start(): void {
     if (this._status !== 'waiting')

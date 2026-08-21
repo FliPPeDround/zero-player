@@ -113,6 +113,7 @@ defineGameFlowSuite(
         const rejected = await match.agentB.call<GomokuPayload>('make-gomoku-move', {
           move: 'H8',
           reason: '尝试抢黑方回合（不应生效）',
+          message: '白方抢跑（不应生效）',
         })
         expect(rejected.message).toMatch(/not your turn/i)
         expect(rejected.status).toBe('playing')

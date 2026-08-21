@@ -73,7 +73,7 @@ export interface LiarDiceState {
   lastMoveLabel?: string
 }
 
-const LIAR_DICE_BID_PATTERN = /^([1-9]|10)[x×]([2-6])$/i
+export const LIAR_DICE_BID_PATTERN = /^([1-9]|10)[x×]([2-6])$/i
 const LIAR_DICE_CALL_PATTERN = /^(?:call|开)$/i
 
 /**

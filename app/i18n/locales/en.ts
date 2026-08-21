@@ -34,7 +34,6 @@ const en = {
 
   'rooms.title': 'Rooms',
   'rooms.search': 'Search rooms',
-  'rooms.loading': 'Loading rooms',
   'rooms.noMatching': 'No matching rooms',
   'rooms.noRooms': 'No rooms yet',
   'rooms.noMatchingHint': 'Try a different status or search term.',

@@ -40,35 +40,30 @@ const statusMeta = computed<Record<RoomSummary['status'], {
   color: string | false
   label: string
   icon: string
-  accent: string
   progress: string
 }>>(() => ({
   waiting: {
     color: 'warning',
     label: t('status.waiting'),
     icon: 'i-carbon-time',
-    accent: 'bg-warning-400',
     progress: 'bg-warning-500',
   },
   playing: {
     color: 'success',
     label: t('status.playing'),
     icon: 'i-carbon-play',
-    accent: 'bg-success-500',
     progress: 'bg-success-500',
   },
   finished: {
     color: false,
     label: t('status.finished'),
     icon: 'i-carbon-checkmark',
-    accent: 'bg-hover',
     progress: 'bg-hover',
   },
   aborted: {
     color: 'error',
     label: t('status.aborted'),
     icon: 'i-carbon-stop-outline',
-    accent: 'bg-error-400',
     progress: 'bg-error-500',
   },
 }))
@@ -110,11 +105,6 @@ const closesInLabel = computed(() => {
     as="article"
     class="group p-4 flex flex-col gap-3 transition relative overflow-hidden hover:border-active hover:bg-secondary"
   >
-    <!-- <span
-      class="h-0.5 inset-x-0 top-0 absolute"
-      :class="statusMeta[room.status].accent"
-      aria-hidden="true"
-    /> -->
     <NuxtLink
       :to="`/rooms/${room.id}`"
       class="outline-none rounded-xl inset-0 absolute focus-visible:ring-2 focus-visible:ring-primary-500/40"

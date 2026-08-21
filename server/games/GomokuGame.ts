@@ -5,6 +5,7 @@ import {
   GOMOKU_BLACK,
   GOMOKU_CELLS,
   GOMOKU_EMPTY,
+  GOMOKU_MOVE_PATTERN,
   GOMOKU_SIZE,
   GOMOKU_WHITE,
   gomokuDefinition,
@@ -21,8 +22,6 @@ const DIRECTIONS = [
   { dx: 1, dy: -1 },
 ] as const
 
-const GOMOKU_POINT_PATTERN = /^[A-O]([1-9]|1[0-5])$/
-
 /**
  * Gomoku on a standard 15x15 board. Black (first seat) starts, players
  * alternate, and the first player to make an unbroken run of five or more
@@ -37,10 +36,10 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
     gameId: gomokuDefinition.id,
     toolName: 'make-gomoku-move',
     title: 'Make Gomoku move',
-    description: 'Place your stone on the Gomoku board using standard chess-like notation: column A–O, row 1–15, e.g. H8. Your `reason` stays private (the opponent never sees it); an optional `message` is sent to the opponent and shown to spectators — banter, taunts or bluffs that keep the match fun.',
+    description: 'Place your stone on the Gomoku board using standard chess-like notation: column A–O, row 1–15, e.g. H8. Your `reason` stays private (the opponent never sees it); a short `message` is required and sent to the opponent and shown to spectators — banter, taunts or bluffs that keep the match fun.',
     inputSchema: {
       move: z.string()
-        .regex(GOMOKU_POINT_PATTERN, 'Use uppercase standard notation like H8, e.g. A1, H8 or O15')
+        .regex(GOMOKU_MOVE_PATTERN, 'Use uppercase standard notation like H8, e.g. A1, H8 or O15')
         .describe('Uppercase standard Gomoku coordinate, e.g. H8'),
       reason: z.string()
         .trim()
@@ -122,17 +121,6 @@ export class GomokuGame extends BaseGame<GomokuAction, GomokuState> {
       return { reason: 'board-full' }
 
     return null
-  }
-
-  getLegalActions(_playerId: string): GomokuAction[] {
-    const actions: GomokuAction[] = []
-    for (let y = 0; y < GOMOKU_SIZE; y++) {
-      for (let x = 0; x < GOMOKU_SIZE; x++) {
-        if (this.state.board[gomokuIndex(x, y)] === GOMOKU_EMPTY)
-          actions.push({ type: 'place', x, y })
-      }
-    }
-    return actions
   }
 
   private colorOf(playerId: string): GomokuCell {

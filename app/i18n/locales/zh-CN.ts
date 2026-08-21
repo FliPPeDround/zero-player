@@ -36,7 +36,6 @@ const zhCN: MessageSchema = {
 
   'rooms.title': '房间',
   'rooms.search': '搜索房间',
-  'rooms.loading': '正在加载房间',
   'rooms.noMatching': '没有匹配的房间',
   'rooms.noRooms': '暂无房间',
   'rooms.noMatchingHint': '试试其他状态或搜索词。',

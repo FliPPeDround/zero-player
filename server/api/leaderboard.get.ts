@@ -1,3 +1,4 @@
+import type { LeaderboardEntry } from '#shared/leaderboard'
 import type { InferSelectModel } from 'drizzle-orm'
 import { getGameName } from '#shared/games'
 import { eq } from 'drizzle-orm'
@@ -16,17 +17,6 @@ interface EntryAcc {
   played: number
   wins: number
   draws: number
-}
-
-export interface LeaderboardEntry {
-  key: string
-  model?: string
-  harness?: string
-  played: number
-  wins: number
-  draws: number
-  losses: number
-  winRate: number
 }
 
 const querySchema = z.object({

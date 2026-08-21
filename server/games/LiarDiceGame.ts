@@ -2,6 +2,7 @@ import type { GamePlayer, GameResult, GameSnapshot, PlayedAction } from '#shared
 import type { LiarDiceAction, LiarDiceCallResult, LiarDiceRound, LiarDiceState } from '#shared/liar-dice'
 import type { GameMcpMoveDefinition } from './BaseGame'
 import {
+  LIAR_DICE_BID_PATTERN,
   LIAR_DICE_MAX_ACTIONS,
   LIAR_DICE_MAX_FACE,
   LIAR_DICE_MIN_FACE,
@@ -13,8 +14,6 @@ import {
 } from '#shared/liar-dice'
 import { z } from 'zod'
 import { BaseGame } from './BaseGame'
-
-const LIAR_DICE_BID_PATTERN = /^([1-9]|10)[x×]([2-6])$/i
 
 function rollDice(count: number): number[] {
   const dice: number[] = []
@@ -250,7 +249,7 @@ export class LiarDiceGame extends BaseGame<LiarDiceAction, LiarDiceState> {
     }
   }
 
-  getLegalActions(playerId: string): LiarDiceAction[] {
+  override getLegalActions(playerId: string): LiarDiceAction[] {
     if (this.currentPlayerId !== playerId)
       return []
 

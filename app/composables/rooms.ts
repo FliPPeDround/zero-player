@@ -58,7 +58,6 @@ function watchFallbackPolling(connected: Ref<boolean>, poll: () => void, shouldS
 export async function useRoomListFeed() {
   const { data: initialRooms, refresh } = await useFetch<RoomSummary[]>('/api/rooms')
   const rooms = ref<RoomSummary[]>(initialRooms.value ?? [])
-  const loaded = ref(true)
   const connected = ref(false)
 
   const { open, close } = useWebSocket('/ws/rooms', {
@@ -75,7 +74,6 @@ export async function useRoomListFeed() {
 
       if (message.type === 'snapshot') {
         rooms.value = message.rooms
-        loaded.value = true
       }
       else if (message.type === 'created' || message.type === 'updated') {
         const index = rooms.value.findIndex(room => room.id === message.room.id)
@@ -98,7 +96,6 @@ export async function useRoomListFeed() {
 
   return {
     rooms,
-    loaded,
     connected,
     open,
     close,

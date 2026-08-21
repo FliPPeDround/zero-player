@@ -9,8 +9,8 @@ import { eq, lt } from 'drizzle-orm'
  * reliability. Collision resistance is overkill for a handful of temporary
  * sessions, but 62^12 leaves plenty of margin anyway.
  */
-export const AGENT_TOKEN_LENGTH = 12
-export const AGENT_TOKEN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+const AGENT_TOKEN_LENGTH = 12
+const AGENT_TOKEN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
 const tokenTtlDays = Number(process.env.AGENT_TOKEN_TTL_DAYS || 30)
 

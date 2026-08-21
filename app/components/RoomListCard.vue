@@ -4,7 +4,6 @@ import { getGameName } from '#shared/games'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
-import FeedbackLoading from '@antfu/design/components/Feedback/FeedbackLoading.vue'
 import FeedbackSpinner from '@antfu/design/components/Feedback/FeedbackSpinner.vue'
 import FormSearchField from '@antfu/design/components/Form/FormSearchField.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
@@ -13,7 +12,6 @@ import LayoutTabs from '@antfu/design/components/Layout/LayoutTabs.vue'
 
 const props = defineProps<{
   rooms: RoomSummary[]
-  loaded: boolean
   connected: boolean
   admin?: boolean
   adminSecret?: string | null
@@ -106,9 +104,8 @@ watch([search, statusFilter], () => {
     </div>
     <LayoutTabs v-model="statusFilter" :tabs="statusTabs" variant="segment" class="p-2" />
     <div class="border-t border-base">
-      <FeedbackLoading v-if="!loaded && !rooms.length" panel :text="t('rooms.loading')" />
       <LayoutPanelGrids
-        v-else-if="!filteredRooms.length"
+        v-if="!filteredRooms.length"
         variant="dots"
         :size="18"
       >

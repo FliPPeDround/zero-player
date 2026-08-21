@@ -179,7 +179,7 @@ useHead({
         :class="isTwentyFour
           ? 'lg:grid-cols-1'
           : isLiarDice
-            ? 'lg:grid-cols-1 lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'
+            ? 'lg:grid-cols-1 lg:grid-rows-1 lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'
             : isGomoku
               ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]'
               : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'"
