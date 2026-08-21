@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { RoomPlayer } from '#shared/rooms'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 
@@ -20,7 +19,7 @@ const { t } = useAppI18n()
     :class="[player ? '' : 'border-dashed', highlight ? 'border-active bg-active' : '']"
   >
     <template v-if="player">
-      <DisplayAvatar :name="player.nickname" :size="44" />
+      <PlayerAvatar :token="player.sessionId" :title="player.nickname" :size="44" />
       <div class="min-w-0">
         <div class="flex gap-2 items-center">
           <span class="font-medium truncate">{{ player.nickname }}</span>

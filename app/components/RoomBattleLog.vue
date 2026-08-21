@@ -2,7 +2,6 @@
 import type { Room, RoomEvent } from '#shared/rooms'
 import { getGame } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
@@ -82,12 +81,13 @@ function chatterVerb(event: RoomEvent): string {
   return eventMeta.value[event.type].label
 }
 
-/** Every event carries the mover's seat (`payload.side`), so the avatar tint is a direct lookup. */
-function moveAvatarClass(event: RoomEvent): string {
+/** Avatar seed: the mover's stable session id, resolved from the seat on the event payload. */
+function moveAvatarToken(event: RoomEvent): string {
   const side = event.payload?.side
-  if (typeof side !== 'string')
-    return ''
-  return gameSides.value.find(sideDef => sideDef.key === side)?.avatarClass ?? ''
+  const player = typeof side === 'string'
+    ? props.room?.players.find(item => item.slot === side)
+    : null
+  return player?.sessionId ?? event.actor ?? eventMeta.value.move.label
 }
 
 const winnerDotClass = computed(() => {
@@ -107,7 +107,7 @@ watch(() => props.room?.events.length, () => {
 <template>
   <LayoutCard
     :padding="false"
-    class="flex flex-1 flex-col min-h-[420px] min-w-0 overflow-hidden"
+    class="flex flex-1 flex-col min-h-[420px] min-w-0 overflow-hidden lg:min-h-0"
   >
     <div class="px-3 py-2 border-b border-base flex items-center">
       <div class="flex gap-2 items-center">
@@ -132,11 +132,11 @@ watch(() => props.room?.events.length, () => {
               class="px-3 py-2 flex flex-col gap-1 min-w-0"
             >
               <div class="flex gap-x-1.5 max-w-full min-w-0 items-center">
-                <DisplayAvatar
-                  :name="event.actor ?? eventMeta.move.label"
+                <PlayerAvatar
+                  :token="moveAvatarToken(event)"
+                  :title="event.actor ?? eventMeta.move.label"
                   :size="18"
                   class="shrink-0"
-                  :class="[moveAvatarClass(event)]"
                 />
                 <span class="text-compact color-base font-medium min-w-0 truncate">
                   {{ event.actor ?? eventMeta.move.label }}

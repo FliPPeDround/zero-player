@@ -3,7 +3,6 @@ import type { GameSide } from '#shared/games'
 import type { LiarDiceState } from '#shared/liar-dice'
 import type { Room, RoomPlayer } from '#shared/rooms'
 import { getGame } from '#shared/games'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumberBadge from '@antfu/design/components/Display/DisplayNumberBadge.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
@@ -196,10 +195,6 @@ function playerSide(player: RoomPlayer | null): GameSide | null {
   return sides.value.find(side => side.key === player?.slot) ?? null
 }
 
-function playerAvatarClass(player: RoomPlayer | null): string {
-  return playerSide(player)?.avatarClass ?? ''
-}
-
 /** The side that won the call: whoever did not lose the die. */
 function roundWinnerSide(round: RoundView): GameSide | null {
   const call = round.call
@@ -370,12 +365,12 @@ function dieTitle(nickname: string, index: number): string {
                     class="flex gap-2 min-w-0 items-center"
                     :class="hand.side.key === sides[0]?.key ? '' : 'flex-row-reverse'"
                   >
-                    <DisplayAvatar
+                    <PlayerAvatar
                       v-if="hand.player"
-                      :name="hand.player.nickname"
+                      :token="hand.player.sessionId"
+                      :title="hand.player.nickname"
                       :size="28"
                       class="shrink-0"
-                      :class="[hand.side.avatarClass]"
                     />
                     <span
                       v-else
@@ -503,12 +498,12 @@ function dieTitle(nickname: string, index: number): string {
                 class="gap-2 grid grid-cols-[28px_minmax(0,1fr)_28px] items-start"
               >
                 <div class="flex justify-start">
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="action.player?.slot === sides[0]?.key"
-                    :name="action.player?.nickname ?? t('ld.agent')"
+                    :token="action.player?.sessionId ?? t('ld.agent')"
+                    :title="action.player?.nickname ?? t('ld.agent')"
                     :size="24"
                     class="shrink-0"
-                    :class="[playerAvatarClass(action.player)]"
                   />
                 </div>
                 <div class="min-w-0">
@@ -546,12 +541,12 @@ function dieTitle(nickname: string, index: number): string {
                   </div>
                 </div>
                 <div class="flex justify-end">
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="action.player?.slot !== sides[0]?.key"
-                    :name="action.player?.nickname ?? t('ld.agent')"
+                    :token="action.player?.sessionId ?? t('ld.agent')"
+                    :title="action.player?.nickname ?? t('ld.agent')"
                     :size="24"
                     class="shrink-0"
-                    :class="[playerAvatarClass(action.player)]"
                   />
                 </div>
               </div>
@@ -561,12 +556,12 @@ function dieTitle(nickname: string, index: number): string {
                 class="gap-2 grid grid-cols-[28px_minmax(0,1fr)_28px] items-start"
               >
                 <div class="flex justify-start">
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="turnPlayer.slot === sides[0]?.key"
-                    :name="turnPlayer.nickname"
+                    :token="turnPlayer.sessionId"
+                    :title="turnPlayer.nickname"
                     :size="24"
                     class="shrink-0"
-                    :class="[playerAvatarClass(turnPlayer)]"
                   />
                 </div>
                 <div class="min-w-0">
@@ -585,12 +580,12 @@ function dieTitle(nickname: string, index: number): string {
                   </div>
                 </div>
                 <div class="flex justify-end">
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="turnPlayer.slot !== sides[0]?.key"
-                    :name="turnPlayer.nickname"
+                    :token="turnPlayer.sessionId"
+                    :title="turnPlayer.nickname"
                     :size="24"
                     class="shrink-0"
-                    :class="[playerAvatarClass(turnPlayer)]"
                   />
                 </div>
               </div>

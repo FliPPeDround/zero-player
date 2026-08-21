@@ -170,7 +170,6 @@ const liarDiceSides: GameSide[] = [
     color: 'primary',
     surfaceClass: 'bg-primary-500/10 dark:bg-primary-400/10',
     dotClass: 'bg-primary-500 ring-1 ring-primary-500/40',
-    avatarClass: 'side-avatar-one',
   },
   {
     key: 'two',
@@ -178,7 +177,6 @@ const liarDiceSides: GameSide[] = [
     color: 'primary',
     surfaceClass: 'bg-primary-500/10 dark:bg-primary-400/10',
     dotClass: 'bg-primary-500 ring-1 ring-primary-500/40',
-    avatarClass: 'side-avatar-two',
   },
 ]
 

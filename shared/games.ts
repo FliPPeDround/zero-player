@@ -15,8 +15,6 @@ export interface GameSide {
   surfaceClass: string
   /** Small status dot at the end of the seat row. */
   dotClass: string
-  /** Optional class applied to avatar fallbacks. */
-  avatarClass: string
 }
 
 export interface GameDefinition {

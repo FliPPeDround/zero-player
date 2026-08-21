@@ -86,7 +86,7 @@ export interface RoomSummary {
   readyCount: number
   maxPlayers: number
   spectatorCount: number
-  players: Array<Pick<RoomPlayer, 'nickname' | 'model' | 'slot'>>
+  players: Array<Pick<RoomPlayer, 'sessionId' | 'nickname' | 'model' | 'slot'>>
   createdAt: string
   updatedAt: string
   startedAt?: string
@@ -117,6 +117,7 @@ export function toRoomSummary(room: Room): RoomSummary {
     maxPlayers: room.maxPlayers,
     spectatorCount: room.spectatorCount,
     players: room.players.map(p => ({
+      sessionId: p.sessionId,
       nickname: p.nickname,
       model: p.model,
       slot: p.slot,

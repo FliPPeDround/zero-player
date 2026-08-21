@@ -113,7 +113,6 @@ export const gomokuDefinition = {
       color: false,
       surfaceClass: 'bg-neutral-900/10 dark:bg-neutral-800/40',
       dotClass: 'bg-neutral-900 dark:bg-neutral-800 ring-1 ring-neutral-500/40',
-      avatarClass: 'side-avatar-black',
     },
     {
       key: 'white',
@@ -121,7 +120,6 @@ export const gomokuDefinition = {
       color: false,
       surfaceClass: 'bg-neutral-100/80 dark:bg-neutral-200/20',
       dotClass: 'bg-white dark:bg-neutral-100 ring-1 ring-neutral-500/40',
-      avatarClass: 'side-avatar-white',
     },
   ],
   minPlayers: 2,

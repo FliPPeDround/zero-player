@@ -59,38 +59,6 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-.side-avatar-black > span,
-.side-avatar-white > span,
-.side-avatar-one > span,
-.side-avatar-two > span {
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.side-avatar-black > span {
-  background: #202124 !important;
-  color: #f8f7f2 !important;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
-}
-
-.side-avatar-white > span {
-  background: #f8f7f2 !important;
-  color: #202124 !important;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
-}
-
-.side-avatar-one > span {
-  background: #7c9fc4 !important;
-  color: #fff !important;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
-}
-
-.side-avatar-two > span {
-  background: #c08686 !important;
-  color: #fff !important;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
-}
-
 html.dark {
   color-scheme: dark;
 }

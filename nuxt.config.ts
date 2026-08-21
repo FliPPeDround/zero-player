@@ -52,6 +52,7 @@ export default defineNuxtConfig({
   css: [
     '@unocss/reset/tailwind.css',
     '@antfu/design/styles.css',
+    'blobatar/motion.css',
     '~/assets/css/overrides.css',
   ],
 

@@ -3,7 +3,6 @@ import type { GomokuState } from '#shared/gomoku'
 import { getGame } from '#shared/games'
 import { gomokuMoveLabel } from '#shared/gomoku'
 import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
@@ -181,9 +180,11 @@ useHead({
           ? 'lg:grid-cols-1'
           : isLiarDice
             ? 'lg:grid-cols-1 lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'
-            : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'"
+            : isGomoku
+              ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]'
+              : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:h-[calc(100vh_-_10rem)] lg:min-h-[560px] lg:max-h-[820px]'"
       >
-        <div class="flex flex-col gap-4 min-w-0 lg:min-h-0 lg:justify-center">
+        <div class="flex flex-col gap-4 min-w-0">
           <section
             v-if="isVersus && !isGomoku && !isTwentyFour && !isLiarDice"
             class="gap-3 grid items-stretch md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
@@ -223,14 +224,15 @@ useHead({
           </section>
 
           <section v-if="isGomoku" class="gap-4 grid">
-            <LayoutCard :padding="false" class="min-w-0 overflow-hidden">
+            <LayoutCard :padding="false" class="min-w-0 overflow-hidden lg:min-h-[480px]">
               <div class="px-3 py-2 border-b border-base gap-x-4 gap-y-2 grid items-center sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
                 <div class="flex gap-2 min-w-0 items-center">
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="firstPlayer"
-                    :name="firstPlayer.nickname"
+                    :token="firstPlayer.sessionId"
+                    :title="firstPlayer.nickname"
                     :size="28"
-                    class="shrink-0" :class="[firstSide?.avatarClass]"
+                    class="shrink-0"
                   />
                   <span
                     v-else
@@ -304,11 +306,12 @@ useHead({
                       {{ t('status.waiting') }}
                     </div>
                   </div>
-                  <DisplayAvatar
+                  <PlayerAvatar
                     v-if="secondPlayer"
-                    :name="secondPlayer.nickname"
+                    :token="secondPlayer.sessionId"
+                    :title="secondPlayer.nickname"
                     :size="28"
-                    class="shrink-0" :class="[secondSide?.avatarClass]"
+                    class="shrink-0"
                   />
                   <span
                     v-else
@@ -317,6 +320,12 @@ useHead({
                   />
                 </div>
               </div>
+              <!--
+                The board is square and sized by its column width, so it can
+                never collapse below ~600px at the desktop breakpoint; the card
+                also keeps a minimum height so both columns stay usable on
+                short windows.
+              -->
               <div class="mx-auto p-2 max-w-[680px] sm:p-3">
                 <GomokuBoard :game="room.game ?? null" />
               </div>

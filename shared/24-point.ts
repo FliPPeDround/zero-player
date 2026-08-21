@@ -68,7 +68,6 @@ export const twentyFourPointDefinition = {
       color: 'primary',
       surfaceClass: 'bg-primary-500/10 dark:bg-primary-400/10',
       dotClass: 'bg-primary-500 ring-1 ring-primary-500/40',
-      avatarClass: 'side-avatar-one',
     },
     {
       key: 'two',
@@ -76,7 +75,6 @@ export const twentyFourPointDefinition = {
       color: 'primary',
       surfaceClass: 'bg-primary-500/10 dark:bg-primary-400/10',
       dotClass: 'bg-primary-500 ring-1 ring-primary-500/40',
-      avatarClass: 'side-avatar-two',
     },
   ],
   minPlayers: 2,

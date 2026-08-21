@@ -4,7 +4,6 @@ import type { GameSide } from '#shared/games'
 import type { Room, RoomEvent, RoomPlayer } from '#shared/rooms'
 import { TWENTY_FOUR_QUESTIONS } from '#shared/24-point'
 import { getGame } from '#shared/games'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayDuration from '@antfu/design/components/Display/DisplayDuration.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
@@ -146,12 +145,12 @@ function questionDotClass(panel: TwentyFourPanel, question: number): string {
       >
         <div class="px-4 py-3 border-b border-base flex gap-3 items-center justify-between">
           <div class="flex gap-2 min-w-0 items-center">
-            <DisplayAvatar
+            <PlayerAvatar
               v-if="panel.player"
-              :name="panel.player.nickname"
+              :token="panel.player.sessionId"
+              :title="panel.player.nickname"
               :size="28"
               class="shrink-0"
-              :class="[panel.side.avatarClass]"
             />
             <span
               v-else

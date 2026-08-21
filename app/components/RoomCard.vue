@@ -3,7 +3,6 @@ import type { GameSide } from '#shared/games'
 import type { RoomSummary } from '#shared/rooms'
 import { getGame } from '#shared/games'
 import ActionIconButton from '@antfu/design/components/Action/ActionIconButton.vue'
-import DisplayAvatar from '@antfu/design/components/Display/DisplayAvatar.vue'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
 import DisplayProgressBar from '@antfu/design/components/Display/DisplayProgressBar.vue'
@@ -169,11 +168,11 @@ const closesInLabel = computed(() => {
           ? ['border-base', entry.side.surfaceClass]
           : 'border-dashed border-mute'"
       >
-        <DisplayAvatar
+        <PlayerAvatar
           v-if="entry.player"
-          :name="entry.player.nickname"
+          :token="entry.player.sessionId"
+          :title="entry.player.nickname"
           :size="22"
-          :class="entry.side.avatarClass"
         />
         <span v-else class="i-carbon-user-avatar text-lg op-mute shrink-0" aria-hidden="true" />
         <div class="flex flex-1 gap-1.5 min-w-0 items-center">
