@@ -2,9 +2,9 @@ import { getAgentFromEvent } from '../../../utils/agent'
 import { closeRoom } from '../../../utils/room-store'
 
 /**
- * Host-only close. Waiting and terminal rooms are deleted immediately; a
- * running game is aborted (`abandoned`, no winner) and removed after the
- * terminal retention window.
+ * Host-only close. Waiting rooms are deleted immediately; terminal rooms are
+ * archived (still listed under finished/aborted) and a running game is
+ * aborted (`abandoned`, no winner) before following the same archive path.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')

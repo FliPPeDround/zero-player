@@ -29,6 +29,13 @@
       "when": 1786421129308,
       "tag": "0003_drop_jwks",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786430000000,
+      "tag": "0004_archived_rooms",
+      "breakpoints": true
     }
   ]
 }

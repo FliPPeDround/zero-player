@@ -57,6 +57,23 @@ export const games = sqliteTable('games', {
   moveCount: integer('move_count').notNull(),
 })
 
+/**
+ * Full Room snapshots archived when a terminal room (`finished`/`aborted`)
+ * leaves KV. The dataset tables above keep the training-data projection;
+ * this table keeps the complete final state (board, events, players) so the
+ * web room page can still render closed rooms after the KV retention window.
+ */
+export const archivedRooms = sqliteTable('archived_rooms', {
+  /** Room id (same as the dataset `games.id`). */
+  id: text('id').primaryKey(),
+  /** `finished` or `aborted` — archived rooms are always terminal. */
+  status: text('status').notNull(),
+  /** Final `room.updatedAt`, used to sort the lobby merge. */
+  updatedAt: text('updated_at').notNull(),
+  /** JSON-encoded full Room object at deletion time. */
+  data: text('data').notNull(),
+})
+
 export const moves = sqliteTable('moves', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   /** Game this move belongs to. */

@@ -15,6 +15,7 @@ import { getGame } from '#shared/games'
 import { toRoomSummary } from '#shared/rooms'
 import { createGameInstance } from '../games/registry'
 import { persistFinishedGame } from './game-dataset'
+import { archiveRoom, getArchivedRoom, listArchivedRoomSummaries, toArchivedRoomSummary } from './room-archive'
 
 type ListListener = (message: RoomListSocketMessage) => void
 type DetailListener = (message: RoomDetailSocketMessage) => void
@@ -152,10 +153,10 @@ function isTerminalStatus(status: Room['status']): boolean {
 }
 
 /**
- * Deadline after which the room is closed. `waiting`/`playing` rooms keep
+ * Deadline after which the room leaves KV. `waiting`/`playing` rooms keep
  * extending it on activity (`updatedAt`); terminal rooms keep it fixed at
- * finish/abort time plus the retention window so spectators can review the
- * result before the room disappears.
+ * finish/abort time plus the retention window, after which they are archived
+ * (`archived_rooms`) instead of disappearing from the web.
  */
 function computeClosesAt(room: Room): string | undefined {
   const deadlineMs = (() => {
@@ -223,16 +224,33 @@ async function persistRoom(room: Room, type: 'created' | 'updated'): Promise<voi
   emitDetail(room.id, { type: 'update', room })
 }
 
+/**
+ * Remove the room's live KV copy. Terminal rooms are archived first, so they
+ * stay reviewable from the web (lobby finished/aborted tabs, room page) after
+ * deletion — the room was persisted, not destroyed. Rooms that never reached
+ * a terminal state are deleted outright. List/detail broadcasts reflect the
+ * difference: an archived room keeps its final summary in the feed, a deleted
+ * one is announced as gone.
+ */
 async function deleteRoom(roomId: string, reason = 'closed', by?: string): Promise<Room | null> {
   const room = await getRoom(roomId)
   if (!room)
     return null
   appendEvent(room, 'room_closed', by, { reason })
+  const archived = isTerminalStatus(room.status)
+  if (archived)
+    await archiveRoom(room)
   await kv.del(roomKey(roomId))
   spectatorCounts.delete(roomId)
   await clearRoomSessions(room)
-  emitList('deleted', room)
-  emitDetail(roomId, { type: 'closed', room })
+  if (archived) {
+    emitList('updated', toArchivedRoomSummary(room))
+    emitDetail(roomId, { type: 'update', room })
+  }
+  else {
+    emitList('deleted', room)
+    emitDetail(roomId, { type: 'closed', room })
+  }
   return room
 }
 
@@ -343,9 +361,14 @@ export async function listRooms(query: {
       normalizeRoomSides(room)
       room.spectatorCount = spectatorCounts.get(room.id) ?? room.spectatorCount
     })
-    summaries = rooms
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map(toRoomSummary)
+    // Terminal rooms that already left KV live on in the archive; merge them
+    // in so finished/aborted matches stay listed instead of vanishing.
+    const liveIds = new Set(rooms.map(room => room.id))
+    const archived = await listArchivedRoomSummaries(limit)
+    summaries = [
+      ...rooms.map(toRoomSummary),
+      ...archived.filter(room => !liveIds.has(room.id)),
+    ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     roomListCache = { rooms: summaries, builtAt: Date.now() }
   }
 
@@ -385,6 +408,15 @@ export async function getRoom(roomId: string): Promise<Room | null> {
  */
 export async function getSessionRoomId(sessionId: string): Promise<string | null> {
   return await kv.get<string>(sessionKey(sessionId))
+}
+
+/**
+ * Read path for closed rooms: live KV first, then the terminal-room archive.
+ * Mutations must keep using `getRoom`/`requireRoom` so archived rooms can
+ * never be written back into KV.
+ */
+export async function getRoomWithArchive(roomId: string): Promise<Room | null> {
+  return await getRoom(roomId) ?? await getArchivedRoom(roomId)
 }
 
 export async function requireRoom(roomId: string): Promise<Room> {

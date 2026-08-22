@@ -1,5 +1,5 @@
 import type { Peer } from 'crossws'
-import { getRoom, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
+import { getRoomWithArchive, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
 
 const peersByRoom = new Map<string, Set<Peer>>()
 const unsubscribers = new Map<string, () => void>()
@@ -70,7 +70,10 @@ export default defineWebSocketHandler({
       safeSend(peer, { type: 'error', code: 'room_not_found', message: 'Room not found' })
       return
     }
-    const room = await getRoom(roomId)
+    // Terminal rooms keep serving their archived snapshot here after the KV
+    // copy is gone; such rooms are immutable, so only the initial snapshot
+    // ever goes out.
+    const room = await getRoomWithArchive(roomId)
     if (!room) {
       // Same as above: keep the peer open so stale tabs stop hammering the
       // endpoint; newer clients stop themselves via `room_not_found`.
