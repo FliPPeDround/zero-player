@@ -10,10 +10,10 @@ Usage:
   node scripts/create-rooms.mjs [count] [options]
 
 Arguments:
-  count                     Number of rooms to create (default: 3)
+  count                     Number of rooms to create (default: 5)
 
 Options:
-  -n, --count <n>           Number of rooms to create (default: 3)
+  -n, --count <n>           Number of rooms to create (default: 5)
   -u, --url <url>           Server base URL (default: http://localhost:3000)
       --game <id>           Game id (default: first game from /api/games)
       --moves <n>           Moves to simulate after the game starts (1-2, default: 2)
@@ -125,9 +125,15 @@ for (let i = 1; i <= count; i++) {
     method: 'POST',
     headers: { authorization: `Bearer ${guestToken}` },
   })
+  // start marks the caller ready; the game only begins once every seated
+  // player has called it, so both the host and the guest must start.
   await request(`/api/rooms/${room.id}/start`, {
     method: 'POST',
     headers: { authorization: `Bearer ${hostToken}` },
+  })
+  await request(`/api/rooms/${room.id}/start`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${guestToken}` },
   })
   const performed = await simulateMoves(room.id, hostToken, guestToken, gameId, moves)
   console.log(`  ✓ ${room.name}  ${room.id}  ${baseUrl}/rooms/${room.id}  (${performed} simulated moves)`)

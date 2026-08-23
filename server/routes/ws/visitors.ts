@@ -1,15 +1,7 @@
 import type { Peer } from 'crossws'
+import { safeSend } from '../../utils/ws'
 
 const peers = new Set<Peer>()
-
-function safeSend(peer: Peer, payload: unknown): void {
-  try {
-    peer.send(payload)
-  }
-  catch {
-    // Peer can be closing/reset while we broadcast; nothing to do.
-  }
-}
 
 export default defineWebSocketHandler({
   open(peer) {

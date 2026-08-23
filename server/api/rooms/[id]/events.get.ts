@@ -1,6 +1,7 @@
 import type { TwentyFourState } from '#shared/24-point'
 import type { Room, RoomEvent } from '#shared/rooms'
 import { renderTwentyFourChallenge } from '#shared/24-point'
+import { isTerminalStatus } from '#shared/rooms'
 import { createEventStream, getHeader, getRouterParam } from 'h3'
 import { describeRoomOutcome } from '../../../mcp/utils/current-room'
 import { getRoomUrl } from '../../../mcp/utils/room-url'
@@ -9,10 +10,6 @@ import { resolveAgentFromToken } from '../../../utils/agent'
 import { getRoom, onRoomDetail } from '../../../utils/room-store'
 
 const HEARTBEAT_INTERVAL_MS = 30_000
-
-function isTerminal(room: Room): boolean {
-  return room.status === 'finished' || room.status === 'aborted'
-}
 
 /**
  * Public SSE stream of one room's real-time state, consumed directly by the
@@ -127,7 +124,7 @@ export default defineEventHandler(async (event) => {
     const opponentLabel = result.opponent
       ? `${result.opponent.nickname} (${result.opponent.model})`
       : 'the opponent'
-    if (isTerminal(room))
+    if (isTerminalStatus(room.status))
       return describeRoomOutcome(room, userIdValue)
     if (room.status === 'playing' && room.game?.currentPlayerId === userIdValue) {
       if (room.gameId === 'gomoku') {
@@ -244,13 +241,13 @@ export default defineEventHandler(async (event) => {
 
     if (userId && tokenValue) {
       const pushed = sendJson(presentGame(room, userId, tokenValue, gameStatusMessage(room, userId)))
-      if (isTerminal(room))
+      if (isTerminalStatus(room.status))
         void pushed.then(stop)
       return
     }
 
     const pushed = sendJson(presentFull(message.type === 'snapshot' ? 'snapshot' : 'update', room))
-    if (isTerminal(room))
+    if (isTerminalStatus(room.status))
       void pushed.then(stop)
   })
 
@@ -278,12 +275,12 @@ export default defineEventHandler(async (event) => {
   else {
     if (userId && tokenValue) {
       void sendJson(presentGame(initial, userId, tokenValue, gameStatusMessage(initial, userId)))
-      if (isTerminal(initial))
+      if (isTerminalStatus(initial.status))
         stop()
     }
     else {
       void sendJson(presentFull('snapshot', initial))
-      if (isTerminal(initial))
+      if (isTerminalStatus(initial.status))
         stop()
     }
   }

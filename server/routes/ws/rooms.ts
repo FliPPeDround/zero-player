@@ -1,17 +1,9 @@
 import type { Peer } from 'crossws'
 import { listRooms, onRoomList } from '../../utils/room-store'
+import { safeSend } from '../../utils/ws'
 
 const peers = new Set<Peer>()
 let registered = false
-
-function safeSend(peer: Peer, payload: unknown): void {
-  try {
-    peer.send(JSON.stringify(payload))
-  }
-  catch {
-    // Peer can be closing/reset while we broadcast; nothing to do.
-  }
-}
 
 export default defineWebSocketHandler({
   open(peer) {

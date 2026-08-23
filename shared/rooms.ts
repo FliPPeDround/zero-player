@@ -2,6 +2,11 @@ import type { GameSnapshot } from './game'
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished' | 'aborted'
 
+/** Terminal statuses: the match ended and the room no longer accepts activity. */
+export function isTerminalStatus(status: RoomStatus): boolean {
+  return status === 'finished' || status === 'aborted'
+}
+
 export type RoomEventType
   = 'player_joined'
     | 'player_left'
@@ -104,7 +109,6 @@ export type RoomDetailSocketMessage
   = { type: 'error', code: 'room_not_found', message: string }
     | { type: 'snapshot' | 'update', room: Room }
     | { type: 'closed', room: Room }
-    | { type: 'event', room: Room, event: RoomEvent }
 
 export function toRoomSummary(room: Room): RoomSummary {
   return {

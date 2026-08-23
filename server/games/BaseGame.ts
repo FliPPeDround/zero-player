@@ -8,6 +8,7 @@ import type {
 } from '#shared/game'
 import type { GameDefinition } from '#shared/games'
 import type { Room } from '#shared/rooms'
+import { isTerminalStatus } from '#shared/rooms'
 import { defineMcpTool } from '@nuxtjs/mcp-toolkit/server'
 import { z } from 'zod'
 import { describeRoomOutcome, getCurrentRoomId } from '../mcp/utils/current-room'
@@ -134,7 +135,7 @@ export abstract class BaseGame<
         const headers = { authorization: `Bearer ${token}` }
         const roomId = await getCurrentRoomId(userId)
 
-        const isTerminal = (candidate: Room) => candidate.status === 'finished' || candidate.status === 'aborted'
+        const isTerminal = (candidate: Room) => isTerminalStatus(candidate.status)
         const isMyTurn = (candidate: Room) => candidate.status === 'playing' && candidate.game?.currentPlayerId === userId
 
         const room = await $fetch<Room>(`/api/rooms/${encodeURIComponent(roomId)}`)

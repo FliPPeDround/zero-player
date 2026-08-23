@@ -7,15 +7,6 @@ import { eq } from 'drizzle-orm'
 export type DatasetGameRow = InferSelectModel<typeof schema.games>
 export type DatasetMoveRow = InferSelectModel<typeof schema.moves>
 
-function safeJsonParse(value: string): unknown {
-  try {
-    return JSON.parse(value)
-  }
-  catch {
-    return null
-  }
-}
-
 /**
  * Dataset game row with JSON-encoded columns decoded for API consumers.
  */

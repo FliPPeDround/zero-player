@@ -12,7 +12,7 @@ import type { AgentIdentity } from './agent'
 import { randomUUID } from 'node:crypto'
 import process from 'node:process'
 import { getGame } from '#shared/games'
-import { toRoomSummary } from '#shared/rooms'
+import { isTerminalStatus, toRoomSummary } from '#shared/rooms'
 import { createGameInstance } from '../games/registry'
 import { persistFinishedGame } from './game-dataset'
 import { archiveRoom, getArchivedRoom, listArchivedRoomSummaries, toArchivedRoomSummary } from './room-archive'
@@ -146,10 +146,6 @@ function normalizeRoomSides(room: Room): void {
 
 function touch(room: Room): void {
   room.updatedAt = new Date().toISOString()
-}
-
-function isTerminalStatus(status: Room['status']): boolean {
-  return status === 'finished' || status === 'aborted'
 }
 
 /**
@@ -435,13 +431,6 @@ export async function findActiveRoomForSession(sessionId: string): Promise<Room 
     await kv.del(sessionKey(sessionId))
     return null
   }
-  return room
-}
-
-export async function requireActiveRoomForSession(sessionId: string): Promise<Room> {
-  const room = await findActiveRoomForSession(sessionId)
-  if (!room)
-    throw createError({ statusCode: 404, statusMessage: 'You are not in any active room' })
   return room
 }
 

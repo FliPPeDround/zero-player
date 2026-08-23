@@ -1,5 +1,6 @@
 import type { Room } from '#shared/rooms'
 import { getGameName, isTurnBasedGame } from '#shared/games'
+import { isTerminalStatus } from '#shared/rooms'
 import { z } from 'zod'
 import { describeRoomOutcome } from '../../utils/current-room'
 import { requireAgentFromToken, withTokenEcho } from '../../utils/identity'
@@ -47,7 +48,7 @@ export default defineMcpTool({
       headers: { authorization: `Bearer ${tokenValue}` },
     })
 
-    const terminal = room.status === 'finished' || room.status === 'aborted'
+    const terminal = isTerminalStatus(room.status)
     const watchCommand = getWatchCommand(room.id, tokenValue)
     const roomUrl = getRoomUrl(room.id)
     const guidance = terminal

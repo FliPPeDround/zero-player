@@ -1,19 +1,6 @@
 import type { Room, RoomSummary } from '#shared/rooms'
-import { toRoomSummary } from '#shared/rooms'
+import { isTerminalStatus, toRoomSummary } from '#shared/rooms'
 import { desc, eq } from 'drizzle-orm'
-
-function isTerminalStatus(status: Room['status']): boolean {
-  return status === 'finished' || status === 'aborted'
-}
-
-function safeJsonParse(value: string): unknown {
-  try {
-    return JSON.parse(value)
-  }
-  catch {
-    return null
-  }
-}
 
 /**
  * Archived rooms are history: no expiry countdown and no live spectators.

@@ -1,20 +1,12 @@
 import type { Peer } from 'crossws'
 import { getRoomWithArchive, onRoomDetail, setSpectatorCount } from '../../../utils/room-store'
+import { safeSend } from '../../../utils/ws'
 
 const peersByRoom = new Map<string, Set<Peer>>()
 const unsubscribers = new Map<string, () => void>()
 const roomIdPattern = /^\/ws\/rooms\/([^/]+)$/
 const SPECTATOR_DEBOUNCE_MS = 5000
 const spectatorWrites = new Map<string, { count: number, lastWriteAt: number, timer?: ReturnType<typeof setTimeout> }>()
-
-function safeSend(peer: Peer, payload: unknown): void {
-  try {
-    peer.send(JSON.stringify(payload))
-  }
-  catch {
-    // Peer can be closing/reset while we broadcast; nothing to do.
-  }
-}
 
 function roomIdFromUrl(url: string): string | null {
   const pathname = new URL(url, 'http://localhost').pathname

@@ -19,8 +19,6 @@ export default defineConfig({
     'badge-color-success',
     'badge-color-warning',
     'badge-color-error',
-    'badge-color-red',
-    'badge-color-blue',
   ],
   shortcuts: [
     ['z-nav', 'z-[30]'],
