@@ -19,6 +19,7 @@ onUnmounted(close)
 
 const gameNameLabel = computed(() => room.value ? gameName(room.value.gameId) : '')
 const gameIcon = computed(() => room.value ? getGame(room.value.gameId)?.icon : '')
+const statusMeta = useRoomStatusMeta(() => room.value?.status ?? 'waiting')
 const gameSides = computed(() => room.value ? getGame(room.value.gameId)?.sides ?? [] : [])
 const firstSide = computed(() => gameSides.value[0])
 const secondSide = computed(() => gameSides.value[1])
@@ -108,34 +109,28 @@ useHead({
   <div class="flex flex-col gap-4">
     <LayoutCard :padding="false" class="min-w-0">
       <div class="px-4 py-3 flex flex-wrap gap-x-4 gap-y-2 items-center justify-between">
-        <div class="flex flex-col gap-1 min-w-0">
-          <div class="flex flex-wrap gap-x-3 gap-y-1 min-w-0 items-center">
-            <ActionIconButton
-              as="RouterLink"
-              to="/"
-              icon="i-carbon-arrow-left"
-              :tooltip="t('room.back')"
-              :label="t('room.back')"
-              class="text-base shrink-0"
-            />
-            <h1 class="text-base font-semibold min-w-0 truncate">
-              {{ room?.name ?? t('common.room') }}
-            </h1>
-          </div>
-          <div v-if="room" class="text-mini color-muted font-mono flex gap-1.5 min-w-0 items-center">
-            <span class="truncate">{{ room.id }}</span>
-            <CopyButton
-              :text="room.id"
-              :tooltip="t('room.copyId')"
-              :label="t('room.copyId')"
-              class="shrink-0"
-            />
-          </div>
-        </div>
-        <div v-if="room" class="flex shrink-0 flex-col gap-1 items-end">
-          <DisplayBadge :text="gameNameLabel" :color="false" :icon="gameIcon" />
+        <div class="flex flex-wrap gap-x-3 gap-y-1.5 min-w-0 items-center">
+          <ActionIconButton
+            as="RouterLink"
+            to="/"
+            icon="i-carbon-arrow-left"
+            :tooltip="t('room.back')"
+            :label="t('room.back')"
+            class="text-base shrink-0"
+          />
+          <h1 class="text-lg tracking-tight font-semibold min-w-0 truncate">
+            {{ room?.name ?? t('common.room') }}
+          </h1>
           <DisplayBadge
-            v-if="room.status === 'waiting'"
+            v-if="room"
+            :text="statusMeta.label"
+            :color="statusMeta.color"
+            :icon="statusMeta.icon"
+            rounded="full"
+            class="text-mini shrink-0"
+          />
+          <DisplayBadge
+            v-if="room?.status === 'waiting'"
             :text="t('room.readyBadge', {
               ready: room.readySessionIds?.length ?? 0,
               total: room.players.length,
@@ -144,7 +139,19 @@ useHead({
             rounded="full"
             class="text-mini shrink-0"
           />
-          <span class="text-xs color-muted flex gap-1 items-center">
+        </div>
+        <div v-if="room" class="flex shrink-0 flex-wrap gap-x-3 gap-y-1 items-center">
+          <DisplayBadge :text="gameNameLabel" :color="false" :icon="gameIcon" class="text-mini shrink-0" />
+          <span class="text-mini color-faint font-mono flex gap-1 min-w-0 items-center">
+            <span class="truncate">{{ room.id }}</span>
+            <CopyButton
+              :text="room.id"
+              :tooltip="t('room.copyId')"
+              :label="t('room.copyId')"
+              class="shrink-0"
+            />
+          </span>
+          <span class="text-mini color-muted flex gap-1 items-center">
             <span class="i-carbon-view" aria-hidden="true" />
             <DisplayNumber :value="room.spectatorCount" />
           </span>

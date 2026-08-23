@@ -36,37 +36,7 @@ async function adminClose() {
   }
 }
 
-const statusMeta = computed<Record<RoomSummary['status'], {
-  color: string | false
-  label: string
-  icon: string
-  progress: string
-}>>(() => ({
-  waiting: {
-    color: 'warning',
-    label: t('status.waiting'),
-    icon: 'i-carbon-time',
-    progress: 'bg-warning-500',
-  },
-  playing: {
-    color: 'success',
-    label: t('status.playing'),
-    icon: 'i-carbon-play',
-    progress: 'bg-success-500',
-  },
-  finished: {
-    color: false,
-    label: t('status.finished'),
-    icon: 'i-carbon-checkmark',
-    progress: 'bg-hover',
-  },
-  aborted: {
-    color: 'error',
-    label: t('status.aborted'),
-    icon: 'i-carbon-stop-outline',
-    progress: 'bg-error-500',
-  },
-}))
+const statusMeta = useRoomStatusMeta(() => props.room.status)
 
 const slots = computed<Array<{ side: GameSide, player: RoomSummary['players'][number] | null }>>(() => {
   const sides = getGame(props.room.gameId)?.sides ?? []
@@ -119,9 +89,9 @@ const closesInLabel = computed(() => {
       </span>
       <div class="flex shrink-0 gap-1.5 items-center">
         <DisplayBadge
-          :text="statusMeta[room.status].label"
-          :color="statusMeta[room.status].color"
-          :icon="statusMeta[room.status].icon"
+          :text="statusMeta.label"
+          :color="statusMeta.color"
+          :icon="statusMeta.icon"
           rounded="full"
           class="text-mini"
         />
@@ -211,14 +181,14 @@ const closesInLabel = computed(() => {
       <DisplayProgressBar
         :value="fillRatio"
         :height="3"
-        :color="statusMeta[room.status].progress"
+        :color="statusMeta.progress"
         class="flex-1"
       />
     </div>
 
     <div class="pt-2.5 border-t border-base flex gap-2 items-center justify-between">
       <span class="text-mini color-muted flex gap-1 min-w-0 items-center">
-        <span :class="statusMeta[room.status].icon" aria-hidden="true" />
+        <span :class="statusMeta.icon" aria-hidden="true" />
         <span class="shrink-0">{{ dateInfo.label }}</span>
         <AppDate
           :date="dateInfo.date"
