@@ -8,3 +8,29 @@
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
+
+/*
+ * `floating-vue/nuxt` registers a plugin that imports floating-vue's default
+ * (black) tooltip theme at runtime — its <style> lands AFTER every css-array
+ * file, including this one, so the same-specificity theme selectors below
+ * beat `@antfu/design`'s token recolor: black bubble + black outer arrow with
+ * the design system's forced-visible white inner arrow. Outrank them with the
+ * compound `.v-popper__popper.v-popper--theme-tooltip` (0,3,0) selector —
+ * order-independent. One selector per rule: comma groups make
+ * `transformerDirectives` emit broken `dark:` variants (the `.dark` prefix
+ * lands on one selector only).
+ */
+.v-popper__popper.v-popper--theme-tooltip .v-popper__inner {
+  --uno: 'bg-tooltip color-base border border-base rounded-md text-xs px-2 py-1';
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.v-popper__popper.v-popper--theme-tooltip .v-popper__arrow-outer {
+  --uno: 'border-base';
+}
+
+.v-popper__popper.v-popper--theme-tooltip .v-popper__arrow-inner {
+  /* Matches the `bg-tooltip` fill so the arrow reads as part of the surface. */
+  --uno: 'border-white/75 dark:border-[#111]/75';
+  visibility: visible;
+}

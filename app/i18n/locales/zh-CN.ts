@@ -172,6 +172,8 @@ const zhCN: MessageSchema = {
   'ld.onlyFound': '（只找到 {count}）',
   'ld.noRounds': '暂无轮次',
 
+  'header.menu': '菜单',
+
   'dark.toggle': '切换深色模式',
   'locale.switch': '切换语言',
 

@@ -170,6 +170,8 @@ const en = {
   'ld.onlyFound': '(only {count} found)',
   'ld.noRounds': 'No rounds yet',
 
+  'header.menu': 'Menu',
+
   'dark.toggle': 'Toggle dark mode',
   'locale.switch': 'Switch language',
 

@@ -27,10 +27,14 @@ const { t } = useAppI18n()
         </NuxtLink>
       </template>
       <template #end>
-        <IntegrationGuideModal />
-        <LeaderboardModal />
-        <LocaleSwitcher />
-        <DarkToggle />
+        <!-- The end controls collapse into HeaderMenu's dropdown below `sm`. -->
+        <div class="gap-1 hidden items-center sm:flex">
+          <IntegrationGuideModal />
+          <LeaderboardModal />
+          <LocaleSwitcher />
+          <DarkToggle />
+        </div>
+        <HeaderMenu class="flex sm:hidden" />
       </template>
     </LayoutToolbar>
     <main class="mx-auto px-4 py-6 flex-1 max-w-6xl w-full sm:px-6">

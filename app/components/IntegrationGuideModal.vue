@@ -4,6 +4,8 @@ import OverlayModal from '@antfu/design/components/Overlay/OverlayModal.vue'
 import { highlight } from 'sugar-high'
 import skillMarkdown from '../../skills/zero-player/SKILL.md?raw'
 
+// Omit the built-in trigger when the modal opens from elsewhere (e.g. HeaderMenu).
+defineProps<{ hideTrigger?: boolean }>()
 const requestUrl = useRequestURL()
 const mcpEndpoint = computed(() => `${requestUrl.origin}/mcp`)
 const mcpConfigExample = computed(() => `{
@@ -16,17 +18,17 @@ const mcpConfigExample = computed(() => `{
 }`)
 const mcpConfigHtml = computed(() => highlight(mcpConfigExample.value, { lang: 'json' }))
 
-const open = ref(false)
+const open = defineModel<boolean>({ default: false })
 const { t } = useAppI18n()
 </script>
 
 <template>
   <OverlayModal
-    v-model="open"
+    v-model:open="open"
     :title="t('guide.title')"
     :description="t('guide.description')"
   >
-    <template #trigger>
+    <template v-if="!hideTrigger" #trigger>
       <ActionButton icon="i-carbon-plug" size="sm">
         {{ t('guide.button') }}
       </ActionButton>

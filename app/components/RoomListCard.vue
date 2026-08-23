@@ -102,7 +102,10 @@ watch([search, statusFilter], () => {
       </div>
       <FormSearchField v-model="search" :placeholder="t('rooms.search')" size="sm" class="w-56" />
     </div>
-    <LayoutTabs v-model="statusFilter" :tabs="statusTabs" variant="segment" class="p-2" />
+    <!-- Scrollable on narrow screens: the segment tablist sizes to its content (`w-max`). -->
+    <div class="p-2 overflow-x-auto">
+      <LayoutTabs v-model="statusFilter" :tabs="statusTabs" variant="segment" />
+    </div>
     <div class="border-t border-base">
       <LayoutPanelGrids
         v-if="!filteredRooms.length"
